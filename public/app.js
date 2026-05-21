@@ -376,9 +376,92 @@ function Stats({ orders, userRole }) {
     );
 }
 
+// === ReviewModal ===
+function ReviewModal({ show, orderId, toUserId, onClose, onSubmit }) {
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        const r = await api.request('../api/reviews.php', {
+            action: 'create',
+            order_id: orderId,
+            to_user_id: toUserId,
+            rating,
+            comment
+        });
+        setSubmitting(false);
+        if (r.success) {
+            showToast(r.message, 'success');
+            onSubmit();
+            onClose();
+        } else {
+            showToast(r.message, 'error');
+        }
+    };
+    
+    if (!show) return null;
+    
+    return (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={onClose}>
+            <div className="card" style={{width:'100%',maxWidth:480,margin:0}} onClick={e=>e.stopPropagation()}>
+                <div className="card-header" style={{justifyContent:'space-between'}}>
+                    <span>Оставить отзыв</span>
+                    <button className="button button-small button-outline" onClick={onClose} style={{height:32,width:32,padding:0}}><i className="bi bi-x-lg"></i></button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="card-content-padding">
+                        <div style={{marginBottom:20}}>
+                            <div style={{fontSize:14,fontWeight:600,marginBottom:12}}>Ваша оценка</div>
+                            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+                                {[1,2,3,4,5].map(r => (
+                                    <button key={r} type="button" onClick={()=>setRating(r)} 
+                                        style={{width:48,height:48,border:'none',background:'transparent',cursor:'pointer',fontSize:32,padding:0,transition:'transform 0.2s'}}
+                                        onMouseEnter={e=>e.currentTarget.style.transform='scale(1.2)'}
+                                        onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                                        <i className={r <= rating ? 'bi bi-star-fill' : 'bi bi-star'} style={{color:r <= rating ? '#000' : '#d4d4d4'}}></i>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>Комментарий (необязательно)</div>
+                            <textarea value={comment} onChange={e=>setComment(e.target.value)} 
+                                placeholder="Расскажите о вашем опыте..."
+                                style={{width:'100%',minHeight:100,padding:12,border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,fontFamily:'inherit',resize:'vertical'}}></textarea>
+                        </div>
+                    </div>
+                    <div className="card-footer">
+                        <button type="button" className="button button-outline" onClick={onClose}>Отмена</button>
+                        <button type="submit" className="button button-fill" disabled={submitting}>
+                            {submitting ? <span className="preloader preloader-white" style={{width:16,height:16}}></span> : 'Отправить'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 // === OrderCard ===
 function OrderCard({ order, userRole, userId, onAction }) {
     const [confirm, setConfirm] = useState(null);
+    const [showReview, setShowReview] = useState(false);
+    const [canReview, setCanReview] = useState(null);
+    
+    useEffect(() => {
+        if (order.status === 'delivered') {
+            checkCanReview();
+        }
+    }, [order.id, order.status]);
+    
+    const checkCanReview = async () => {
+        const r = await api.get(`../api/reviews.php?action=can_review&order_id=${order.id}`);
+        if (r.success) setCanReview(r);
+    };
+    
     const doAction = async () => {
         if (!confirm) return;
         const { action, status } = confirm;
@@ -395,6 +478,8 @@ function OrderCard({ order, userRole, userId, onAction }) {
         <React.Fragment>
             <ConfirmDialog show={!!confirm} title="Подтверждение" danger={confirm && confirm.action === 'cancel'}
                 message={confirm ? confirm.label : ''} onConfirm={doAction} onCancel={() => setConfirm(null)} />
+            <ReviewModal show={showReview} orderId={order.id} toUserId={canReview?.to_user_id} 
+                onClose={()=>setShowReview(false)} onSubmit={()=>{checkCanReview();if(onAction)onAction();}} />
             <div className="card order-card">
                 <div className="card-content card-content-padding">
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -438,6 +523,11 @@ function OrderCard({ order, userRole, userId, onAction }) {
                         {userRole === 'client' && order.status === 'pending' && (
                             <button className="button button-outline color-red button-small" onClick={() => setConfirm({ action:'cancel', label:'Отменить заказ #'+order.id+'?' })}>
                                 <i className="bi bi-x-circle" style={{marginRight:4}}></i>Отменить
+                            </button>
+                        )}
+                        {canReview && canReview.can_review && (
+                            <button className="button button-fill button-small" onClick={() => setShowReview(true)}>
+                                <i className="bi bi-star" style={{marginRight:4}}></i>Оставить отзыв
                             </button>
                         )}
                     </div>
@@ -485,6 +575,7 @@ function OrderList({ userRole, userId, refreshKey }) {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [showFilter, setShowFilter] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const loadOrders = async () => {
         setLoading(true);
         const r = await api.request('../api/orders.php', { action: 'list' });
@@ -493,7 +584,18 @@ function OrderList({ userRole, userId, refreshKey }) {
     };
     useEffect(() => { loadOrders(); }, [refreshKey]);
     const filterLabel = { all: 'Все', pending: 'Ожидают', accepted: 'Приняты', in_progress: 'В пути', delivered: 'Доставлены', cancelled: 'Отменены' };
-    const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+    let filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+    if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(o => 
+            String(o.id).includes(q) ||
+            o.pickup_address?.toLowerCase().includes(q) ||
+            o.delivery_address?.toLowerCase().includes(q) ||
+            o.cargo_description?.toLowerCase().includes(q) ||
+            o.client_name?.toLowerCase().includes(q) ||
+            o.driver_name?.toLowerCase().includes(q)
+        );
+    }
     if (loading) return <div className="loading-center"><div className="preloader"></div></div>;
     return (
         <div className="orders-page">
@@ -511,6 +613,18 @@ function OrderList({ userRole, userId, refreshKey }) {
                     <button className="button button-refresh" onClick={loadOrders}>
                         <i className="bi bi-arrow-clockwise"></i>
                     </button>
+                </div>
+            </div>
+            <div style={{marginBottom:20}}>
+                <div style={{position:'relative'}}>
+                    <i className="bi bi-search" style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)',fontSize:16}}></i>
+                    <input type="text" placeholder="Поиск по номеру, адресу, грузу..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
+                        style={{width:'100%',height:44,padding:'0 16px 0 44px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,background:'var(--surface)'}} />
+                    {searchQuery && (
+                        <button onClick={()=>setSearchQuery('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',border:'none',background:'transparent',cursor:'pointer',padding:4}}>
+                            <i className="bi bi-x-lg" style={{fontSize:14,color:'var(--text-muted)'}}></i>
+                        </button>
+                    )}
                 </div>
             </div>
             <div className="orders-list">
@@ -533,8 +647,11 @@ function Profile({ onUpdate, orders }) {
     const [profile, setProfile] = useState(null);
     const [editing, setEditing] = useState(false);
     const [editingDriver, setEditingDriver] = useState(false);
+    const [tab, setTab] = useState('info');
     const [form, setForm] = useState({ full_name: '', phone: '' });
     const [driverForm, setDriverForm] = useState({ car_model: '', car_number: '', license_number: '' });
+    const [securityForm, setSecurityForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+    const [emailForm, setEmailForm] = useState({ new_email: '', password: '' });
     const [loading, setLoading] = useState(false);
     const loadProfile = async () => {
         const r = await api.request('../api/user.php', { action: 'get_profile' });
@@ -563,6 +680,43 @@ function Profile({ onUpdate, orders }) {
         setLoading(false);
         if (r.success) { showToast(r.message,'success'); setEditingDriver(false); loadProfile(); }
         else showToast(r.message,'error');
+    };
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        if (securityForm.new_password !== securityForm.confirm_password) {
+            showToast('Пароли не совпадают', 'error');
+            return;
+        }
+        setLoading(true);
+        const r = await api.request('../api/settings.php', { 
+            action: 'change_password', 
+            current_password: securityForm.current_password,
+            new_password: securityForm.new_password
+        });
+        setLoading(false);
+        if (r.success) { 
+            showToast(r.message,'success'); 
+            setSecurityForm({ current_password: '', new_password: '', confirm_password: '' });
+        } else {
+            showToast(r.message,'error');
+        }
+    };
+    const handleEmailChange = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        const r = await api.request('../api/settings.php', { 
+            action: 'change_email', 
+            new_email: emailForm.new_email,
+            password: emailForm.password
+        });
+        setLoading(false);
+        if (r.success) { 
+            showToast(r.message,'success'); 
+            setEmailForm({ new_email: '', password: '' });
+            loadProfile();
+        } else {
+            showToast(r.message,'error');
+        }
     };
     if (!profile) return <div style={{textAlign:'center',padding:40}}><div className="preloader"></div></div>;
     const roleLabel = { client:'Клиент', driver:'Водитель', admin:'Администратор' };
@@ -598,6 +752,14 @@ function Profile({ onUpdate, orders }) {
                     </div>
                 </div>
             )}
+            
+            <div className="segmented segmented-strong" style={{marginBottom:16}}>
+                <button className={'button'+(tab==='info'?' button-active':'')} onClick={()=>setTab('info')}>Информация</button>
+                <button className={'button'+(tab==='security'?' button-active':'')} onClick={()=>setTab('security')}>Безопасность</button>
+            </div>
+            
+            {tab === 'info' && (
+            <React.Fragment>
             <div className="card">
                 <div className="card-header">Личные данные</div>
                 <div className="card-content card-content-padding">
@@ -659,6 +821,68 @@ function Profile({ onUpdate, orders }) {
                         )}
                     </div>
                 </div>
+            )}
+            </React.Fragment>
+            )}
+            
+            {tab === 'security' && (
+                <React.Fragment>
+                    <div className="card">
+                        <div className="card-header"><i className="bi bi-shield-lock"></i>Смена пароля</div>
+                        <form onSubmit={handlePasswordChange}>
+                            <div className="card-content-padding">
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Текущий пароль</label>
+                                    <input type="password" value={securityForm.current_password} onChange={e=>setSecurityForm(p=>({...p,current_password:e.target.value}))} 
+                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                </div>
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Новый пароль</label>
+                                    <input type="password" value={securityForm.new_password} onChange={e=>setSecurityForm(p=>({...p,new_password:e.target.value}))} 
+                                        required minLength={6} style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                </div>
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Подтвердите новый пароль</label>
+                                    <input type="password" value={securityForm.confirm_password} onChange={e=>setSecurityForm(p=>({...p,confirm_password:e.target.value}))} 
+                                        required minLength={6} style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                </div>
+                            </div>
+                            <div className="card-footer">
+                                <button type="submit" className="button button-fill" disabled={loading}>
+                                    {loading ? <span className="preloader preloader-white" style={{width:16,height:16}}></span> : 'Изменить пароль'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div className="card">
+                        <div className="card-header"><i className="bi bi-envelope"></i>Смена email</div>
+                        <form onSubmit={handleEmailChange}>
+                            <div className="card-content-padding">
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Текущий email</label>
+                                    <input type="email" value={profile.email} disabled 
+                                        style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,background:'var(--gray-100)',color:'var(--text-muted)'}} />
+                                </div>
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Новый email</label>
+                                    <input type="email" value={emailForm.new_email} onChange={e=>setEmailForm(p=>({...p,new_email:e.target.value}))} 
+                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                </div>
+                                <div style={{marginBottom:16}}>
+                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Подтвердите паролем</label>
+                                    <input type="password" value={emailForm.password} onChange={e=>setEmailForm(p=>({...p,password:e.target.value}))} 
+                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                </div>
+                            </div>
+                            <div className="card-footer">
+                                <button type="submit" className="button button-fill" disabled={loading}>
+                                    {loading ? <span className="preloader preloader-white" style={{width:16,height:16}}></span> : 'Изменить email'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </React.Fragment>
             )}
         </div>
     );
@@ -1159,6 +1383,90 @@ function CreateOrder({ onComplete }) {
     );
 }
 
+// === FAQ ===
+function FAQ() {
+    const [openIndex, setOpenIndex] = useState(null);
+    const faqs = [
+        {
+            q: 'Как создать заказ?',
+            a: 'Перейдите на вкладку "Новый заказ", заполните адреса отправки и доставки, укажите информацию о грузе. Система автоматически рассчитает стоимость доставки.'
+        },
+        {
+            q: 'Как отследить мой заказ?',
+            a: 'Все ваши заказы отображаются на вкладке "Заказы". Вы можете видеть текущий статус каждого заказа в реальном времени.'
+        },
+        {
+            q: 'Как стать водителем?',
+            a: 'Обратитесь к администратору для изменения роли на "Водитель". После этого заполните данные автомобиля в профиле.'
+        },
+        {
+            q: 'Как рассчитывается стоимость доставки?',
+            a: 'Стоимость рассчитывается на основе расстояния между адресами, веса груза и его габаритов. Базовая ставка - 100₽ + 50₽/км.'
+        },
+        {
+            q: 'Можно ли отменить заказ?',
+            a: 'Да, вы можете отменить заказ пока он находится в статусе "Ожидает". После принятия водителем отмена невозможна.'
+        },
+        {
+            q: 'Как оставить отзыв?',
+            a: 'После завершения заказа появится кнопка "Оставить отзыв" в карточке заказа. Вы можете оценить работу водителя от 1 до 5 звезд.'
+        },
+        {
+            q: 'Как изменить пароль?',
+            a: 'Перейдите в Профиль → Безопасность. Введите текущий пароль и новый пароль дважды для подтверждения.'
+        },
+        {
+            q: 'Что делать если возникла проблема?',
+            a: 'Свяжитесь с администратором через уведомления или напишите на support@delivercargo.ru'
+        }
+    ];
+    
+    return (
+        <div>
+            <div className="card">
+                <div className="card-header"><i className="bi bi-question-circle"></i>Часто задаваемые вопросы</div>
+                <div className="card-content-padding" style={{padding:0}}>
+                    {faqs.map((faq, i) => (
+                        <div key={i} style={{borderBottom: i < faqs.length - 1 ? '1px solid var(--border)' : 'none'}}>
+                            <button onClick={() => setOpenIndex(openIndex === i ? null : i)} 
+                                style={{width:'100%',padding:'16px 20px',border:'none',background:'transparent',textAlign:'left',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:14,fontWeight:600}}>
+                                <span>{faq.q}</span>
+                                <i className={`bi bi-chevron-${openIndex === i ? 'up' : 'down'}`} style={{fontSize:12,color:'var(--text-muted)'}}></i>
+                            </button>
+                            {openIndex === i && (
+                                <div style={{padding:'0 20px 16px',fontSize:13,color:'var(--text-muted)',lineHeight:1.6}}>
+                                    {faq.a}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+            
+            <div className="card">
+                <div className="card-header"><i className="bi bi-headset"></i>Нужна помощь?</div>
+                <div className="card-content-padding">
+                    <div style={{marginBottom:16}}>
+                        <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>Контакты поддержки</div>
+                        <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:4}}>
+                            <i className="bi bi-envelope" style={{marginRight:8}}></i>
+                            support@delivercargo.ru
+                        </div>
+                        <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:4}}>
+                            <i className="bi bi-telephone" style={{marginRight:8}}></i>
+                            +7 (800) 123-45-67
+                        </div>
+                        <div style={{fontSize:13,color:'var(--text-muted)'}}>
+                            <i className="bi bi-clock" style={{marginRight:8}}></i>
+                            Пн-Пт: 9:00 - 18:00
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // === Dashboard ===
 function Dashboard({ userRole, userName, orders, onNavigate }) {
     const recent = orders.slice(0, 3);
@@ -1267,6 +1575,7 @@ function App() {
         ...(user.role==='client' ? [{ id:'create', icon:'bi-plus-circle', label:'Новый заказ' }] : []),
         { id:'orders', icon:'bi-list-ul', label:'Заказы' },
         { id:'profile', icon:'bi-person', label:'Профиль' },
+        { id:'faq', icon:'bi-question-circle', label:'Помощь' },
         ...(user.role==='admin' ? [{ id:'admin', icon:'bi-shield-lock', label:'Админ' }] : []),
     ];
 
@@ -1324,6 +1633,7 @@ function App() {
                             {activeTab === 'create' && <React.Fragment><PageHeader title="Новый заказ" subtitle="Заполните данные и отправьте заказ за несколько шагов" /><CreateOrder onComplete={() => { setRefreshKey(k => k + 1); setActiveTab('orders'); }} /></React.Fragment>}
                             {activeTab === 'orders' && <OrderList userRole={user.role} userId={user.id} refreshKey={refreshKey} />}
                             {activeTab === 'profile' && <React.Fragment><PageHeader title="Профиль" subtitle="Управляйте личными данными и настройками аккаунта" /><Profile onUpdate={checkAuth} orders={orders} /></React.Fragment>}
+                            {activeTab === 'faq' && <React.Fragment><PageHeader title="Помощь" subtitle="Ответы на часто задаваемые вопросы" /><FAQ /></React.Fragment>}
                             {activeTab === 'admin' && <React.Fragment><PageHeader title="Администрирование" subtitle="Управление заказами и пользователями платформы" /><AdminPanel /></React.Fragment>}
                         </div>
                     </div>
