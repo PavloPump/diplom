@@ -140,6 +140,66 @@ function ConfirmDialog({ show, title, message, onConfirm, onCancel, danger }) {
     );
 }
 
+// === Complete Order Dialog ===
+function CompleteOrderDialog({ show, onConfirm, onCancel }) {
+    const [comment, setComment] = useState('');
+    const [loading, setLoading] = useState(false);
+    
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!comment.trim()) {
+            showToast('Введите комментарий', 'error');
+            return;
+        }
+        setLoading(true);
+        await onConfirm(comment);
+        setLoading(false);
+        setComment('');
+    };
+    
+    if (!show) return null;
+    return (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:99998,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+             onClick={onCancel}>
+            <div className="card" style={{width:'100%',maxWidth:500,margin:0}} onClick={e=>e.stopPropagation()}>
+                <div className="card-header" style={{fontWeight:700,fontSize:18}}>
+                    <i className="bi bi-check-circle"></i>Завершение заказа
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="card-content card-content-padding" style={{padding:24}}>
+                        <p style={{margin:'0 0 16px',fontSize:15,color:'var(--text-muted)'}}>
+                            Укажите комментарий о выполнении заказа (обязательно)
+                        </p>
+                        <textarea 
+                            value={comment} 
+                            onChange={e=>setComment(e.target.value)}
+                            placeholder="Например: Груз доставлен в срок, без повреждений..."
+                            required
+                            style={{
+                                width:'100%',
+                                minHeight:120,
+                                padding:'14px 18px',
+                                border:'1px solid var(--border)',
+                                borderRadius:'var(--radius)',
+                                fontSize:16,
+                                fontFamily:'inherit',
+                                resize:'vertical'
+                            }}
+                        />
+                    </div>
+                    <div className="card-footer" style={{justifyContent:'flex-end',gap:12,padding:16}}>
+                        <button type="button" className="button button-outline" onClick={onCancel} disabled={loading}>
+                            Отмена
+                        </button>
+                        <button type="submit" className="button button-fill" disabled={loading}>
+                            {loading ? <span className="preloader preloader-white" style={{width:16,height:16}}></span> : 'Завершить заказ'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
 
 // === Active Order Tracking ===
 function ActiveOrderTracking({ order, userRole, onComplete }) {
@@ -149,6 +209,7 @@ function ActiveOrderTracking({ order, userRole, onComplete }) {
     const [startTime] = useState(Date.now());
     const [elapsed, setElapsed] = useState(0);
     const [distance, setDistance] = useState(0);
+    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const mapRef = useRef(null);
     const watchId = useRef(null);
     
@@ -289,6 +350,14 @@ function ActiveOrderTracking({ order, userRole, onComplete }) {
     
     return (
         <div>
+            <CompleteOrderDialog 
+                show={showCompleteDialog} 
+                onConfirm={async (comment) => {
+                    await onComplete(comment);
+                    setShowCompleteDialog(false);
+                }}
+                onCancel={() => setShowCompleteDialog(false)}
+            />
             <div className="card" style={{marginBottom:16}}>
                 <div className="card-header">
                     <i className="bi bi-geo-alt-fill"></i>Активный заказ #{order.id}
@@ -349,7 +418,7 @@ function ActiveOrderTracking({ order, userRole, onComplete }) {
                         <i className="bi bi-navigation" style={{marginRight:8}}></i>
                         Открыть в Яндекс.Картах
                     </button>
-                    <button className="button button-fill button-large" onClick={onComplete}>
+                    <button className="button button-fill button-large" onClick={() => setShowCompleteDialog(true)}>
                         <i className="bi bi-check-circle" style={{marginRight:8}}></i>
                         Завершить
                     </button>
@@ -878,6 +947,7 @@ function ReviewModal({ show, orderId, toUserId, onClose, onSubmit }) {
 function OrderCard({ order, userRole, userId, onAction }) {
     const [confirm, setConfirm] = useState(null);
     const [showReview, setShowReview] = useState(false);
+    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [canReview, setCanReview] = useState(null);
     
     useEffect(() => {
@@ -902,11 +972,27 @@ function OrderCard({ order, userRole, userId, onAction }) {
         if (r.success) { showToast(r.message, 'success'); if (onAction) onAction(); }
         else showToast(r.message, 'error');
     };
+    const handleComplete = async (comment) => {
+        const r = await api.request('../api/orders.php', { action: 'update_status', order_id: order.id, status: 'delivered', comment });
+        if (r.success) { 
+            showToast(r.message, 'success'); 
+            setShowCompleteDialog(false);
+            if (onAction) onAction(); 
+        } else {
+            showToast(r.message, 'error');
+        }
+    };
+    
     const myOrder = String(order.driver_id) === String(userId);
     return (
         <React.Fragment>
             <ConfirmDialog show={!!confirm} title="Подтверждение" danger={confirm && confirm.action === 'cancel'}
                 message={confirm ? confirm.label : ''} onConfirm={doAction} onCancel={() => setConfirm(null)} />
+            <CompleteOrderDialog 
+                show={showCompleteDialog} 
+                onConfirm={handleComplete}
+                onCancel={() => setShowCompleteDialog(false)}
+            />
             <ReviewModal show={showReview} orderId={order.id} toUserId={canReview?.to_user_id} 
                 onClose={()=>setShowReview(false)} onSubmit={()=>{checkCanReview();if(onAction)onAction();}} />
             <div className="card order-card">
@@ -945,7 +1031,7 @@ function OrderCard({ order, userRole, userId, onAction }) {
                             </button>
                         )}
                         {userRole === 'driver' && order.status === 'in_progress' && myOrder && (
-                            <button className="button button-fill button-small" onClick={() => setConfirm({ action:'update_status', status:'delivered', label:'Отметить как доставленный?' })}>
+                            <button className="button button-fill button-small" onClick={() => setShowCompleteDialog(true)}>
                                 <i className="bi bi-check-circle" style={{marginRight:4}}></i>Доставлено
                             </button>
                         )}
@@ -2082,8 +2168,8 @@ function App() {
                         <div className="content-wrapper">
                             {activeTab === 'dashboard' && <Dashboard userRole={user.role} userName={user.full_name} orders={orders} onNavigate={setActiveTab} />}
                             {activeTab === 'create' && <React.Fragment><PageHeader title="Новый заказ" subtitle="Заполните данные и отправьте заказ за несколько шагов" /><CreateOrder onComplete={() => { setRefreshKey(k => k + 1); setActiveTab('orders'); }} /></React.Fragment>}
-                            {activeTab === 'active' && activeOrder && <React.Fragment><PageHeader title="Активный заказ" subtitle="Отслеживание доставки в реальном времени" /><ActiveOrderTracking order={activeOrder} userRole={user.role} onComplete={async () => {
-                                const r = await api.request('../api/orders.php', {action:'update_status', order_id:activeOrder.id, status:'delivered', comment:''});
+                            {activeTab === 'active' && activeOrder && <React.Fragment><PageHeader title="Активный заказ" subtitle="Отслеживание доставки в реальном времени" /><ActiveOrderTracking order={activeOrder} userRole={user.role} onComplete={async (comment) => {
+                                const r = await api.request('../api/orders.php', {action:'update_status', order_id:activeOrder.id, status:'delivered', comment:comment});
                                 if(r.success){showToast('Заказ завершён!','success');setRefreshKey(k=>k+1);setActiveTab('orders');}else showToast(r.message,'error');
                             }} /></React.Fragment>}
                             {activeTab === 'orders' && <OrderList userRole={user.role} userId={user.id} refreshKey={refreshKey} />}
