@@ -1077,7 +1077,7 @@ function Profile({ onUpdate, orders }) {
     const [editing, setEditing] = useState(false);
     const [editingDriver, setEditingDriver] = useState(false);
     const [tab, setTab] = useState('info');
-    const [form, setForm] = useState({ full_name: '', phone: '' });
+    const [form, setForm] = useState({ full_name: '', phone: '', passport_data: '' });
     const [driverForm, setDriverForm] = useState({ car_model: '', car_number: '', license_number: '' });
     const [securityForm, setSecurityForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
     const [emailForm, setEmailForm] = useState({ new_email: '', password: '' });
@@ -1086,7 +1086,7 @@ function Profile({ onUpdate, orders }) {
         const r = await api.request('../api/user.php', { action: 'get_profile' });
         if (r.success) {
             setProfile(r.user);
-            setForm({ full_name: r.user.full_name, phone: r.user.phone || '' });
+            setForm({ full_name: r.user.full_name, phone: r.user.phone || '', passport_data: r.user.passport_data || '' });
             if (r.user.driver_info) setDriverForm({ car_model: r.user.driver_info.car_model||'', car_number: r.user.driver_info.car_number||'', license_number: r.user.driver_info.license_number||'' });
         }
     };
@@ -1198,6 +1198,7 @@ function Profile({ onUpdate, orders }) {
                                 <ul>
                                     <li className="item-content item-input"><div className="item-inner"><div className="item-title item-label">ФИО</div><div className="item-input-wrap"><input type="text" value={form.full_name} onChange={e=>setForm(p=>({...p,full_name:e.target.value}))} required /></div></div></li>
                                     <li className="item-content item-input"><div className="item-inner"><div className="item-title item-label">Телефон</div><div className="item-input-wrap"><input type="tel" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} /></div></div></li>
+                                    <li className="item-content item-input"><div className="item-inner"><div className="item-title item-label">Паспорт (серия и номер)</div><div className="item-input-wrap"><input type="text" placeholder="1234 567890" value={form.passport_data} onChange={e=>setForm(p=>({...p,passport_data:e.target.value}))} /></div></div></li>
                                 </ul>
                             </div>
                             <div style={{display:'flex',gap:8,marginTop:12}}>
@@ -1208,6 +1209,7 @@ function Profile({ onUpdate, orders }) {
                     ) : (
                         <div>
                             <div style={{fontSize:14,marginBottom:4}}><strong>Телефон:</strong> {profile.phone || <span style={{color:'#a1a1aa'}}>Не указан</span>}</div>
+                            <div style={{fontSize:14,marginBottom:4}}><strong>Паспорт:</strong> {profile.passport_data || <span style={{color:'#a1a1aa'}}>Не указан</span>}</div>
                             <div style={{fontSize:14,marginBottom:10}}><strong>Регистрация:</strong> {new Date(profile.created_at).toLocaleDateString('ru-RU')}</div>
                             <button className="button button-fill button-small" onClick={()=>setEditing(true)}>
                                 <i className="bi bi-pencil" style={{marginRight:4}}></i>Редактировать

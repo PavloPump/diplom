@@ -45,7 +45,7 @@ function getProfile() {
     
     $user_id = $_SESSION['user_id'];
     
-    $stmt = $conn->prepare("SELECT id, email, full_name, phone, role, created_at FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, email, full_name, phone, passport_data, role, created_at FROM users WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -83,14 +83,15 @@ function updateProfile() {
     $user_id = $_SESSION['user_id'];
     $full_name = $_POST['full_name'] ?? '';
     $phone = $_POST['phone'] ?? '';
+    $passport_data = $_POST['passport_data'] ?? '';
     
     if (empty($full_name)) {
         echo json_encode(['success' => false, 'message' => 'Заполните имя']);
         return;
     }
     
-    $stmt = $conn->prepare("UPDATE users SET full_name = ?, phone = ? WHERE id = ?");
-    $stmt->bind_param("ssi", $full_name, $phone, $user_id);
+    $stmt = $conn->prepare("UPDATE users SET full_name = ?, phone = ?, passport_data = ? WHERE id = ?");
+    $stmt->bind_param("sssi", $full_name, $phone, $passport_data, $user_id);
     
     if ($stmt->execute()) {
         $_SESSION['user_name'] = $full_name;
