@@ -319,19 +319,19 @@ function ActiveOrderTracking({ order, userRole, onComplete }) {
             <div className="card" style={{marginBottom:16}}>
                 <div className="card-header">Детали маршрута</div>
                 <div className="card-content-padding">
-                    <div style={{marginBottom:16}}>
-                        <div style={{fontSize:13,fontWeight:600,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
-                            <i className="bi bi-circle-fill" style={{color:'#22c55e',fontSize:10}}></i>
+                    <div style={{marginBottom:18}}>
+                        <div style={{fontSize:16,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                            <i className="bi bi-circle-fill" style={{color:'#22c55e',fontSize:12}}></i>
                             Откуда забрать
                         </div>
-                        <div style={{fontSize:14,color:'var(--text-muted)',paddingLeft:16}}>{order.pickup_address}</div>
+                        <div style={{fontSize:16,color:'var(--text-muted)',paddingLeft:20}}>{order.pickup_address}</div>
                     </div>
                     <div>
-                        <div style={{fontSize:13,fontWeight:600,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
-                            <i className="bi bi-circle-fill" style={{color:'#ef4444',fontSize:10}}></i>
+                        <div style={{fontSize:16,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                            <i className="bi bi-circle-fill" style={{color:'#ef4444',fontSize:12}}></i>
                             Куда доставить
                         </div>
-                        <div style={{fontSize:14,color:'var(--text-muted)',paddingLeft:16}}>{order.delivery_address}</div>
+                        <div style={{fontSize:16,color:'var(--text-muted)',paddingLeft:20}}>{order.delivery_address}</div>
                     </div>
                 </div>
             </div>
@@ -359,18 +359,18 @@ function ActiveOrderTracking({ order, userRole, onComplete }) {
             <div className="card" style={{marginTop:16}}>
                 <div className="card-header">Информация о грузе</div>
                 <div className="card-content-padding">
-                    <div style={{marginBottom:12}}>
-                        <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Описание</div>
-                        <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_description || 'Не указано'}</div>
+                    <div style={{marginBottom:16}}>
+                        <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>Описание</div>
+                        <div style={{fontSize:16,color:'var(--text-muted)'}}>{order.cargo_description || 'Не указано'}</div>
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
                         <div>
-                            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Вес</div>
-                            <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_weight ? order.cargo_weight + ' кг' : 'Не указано'}</div>
+                            <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>Вес</div>
+                            <div style={{fontSize:16,color:'var(--text-muted)'}}>{order.cargo_weight ? order.cargo_weight + ' кг' : 'Не указано'}</div>
                         </div>
                         <div>
-                            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Габариты</div>
-                            <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_dimensions || 'Не указано'}</div>
+                            <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>Габариты</div>
+                            <div style={{fontSize:16,color:'var(--text-muted)'}}>{order.cargo_dimensions || 'Не указано'}</div>
                         </div>
                     </div>
                 </div>
@@ -911,26 +911,26 @@ function OrderCard({ order, userRole, userId, onAction }) {
                 onClose={()=>setShowReview(false)} onSubmit={()=>{checkCanReview();if(onAction)onAction();}} />
             <div className="card order-card">
                 <div className="card-content card-content-padding">
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                        <span style={{fontWeight:600,fontSize:15}}>Заказ #{order.id}</span>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                        <span style={{fontWeight:600,fontSize:18}}>Заказ #{order.id}</span>
                         <StatusBadge status={order.status} />
                     </div>
-                    <div style={{fontSize:13,marginBottom:4}}>
-                        <i className="bi bi-circle" style={{color:'#09090b',marginRight:6,fontSize:10}}></i>
+                    <div style={{fontSize:16,marginBottom:6}}>
+                        <i className="bi bi-circle" style={{color:'#09090b',marginRight:8,fontSize:12}}></i>
                         <strong>От:</strong> {order.pickup_address}
                     </div>
-                    <div style={{fontSize:13,marginBottom:6}}>
-                        <i className="bi bi-geo-alt-fill" style={{color:'#09090b',marginRight:6,fontSize:10}}></i>
+                    <div style={{fontSize:16,marginBottom:8}}>
+                        <i className="bi bi-geo-alt-fill" style={{color:'#09090b',marginRight:8,fontSize:12}}></i>
                         <strong>До:</strong> {order.delivery_address}
                     </div>
-                    {order.cargo_description && <div style={{fontSize:12,color:'#71717a',marginBottom:4}}><i className="bi bi-box-seam" style={{marginRight:4}}></i>{order.cargo_description}</div>}
-                    {order.cargo_weight > 0 && <div style={{fontSize:12,color:'#71717a',marginBottom:4}}>Вес: {order.cargo_weight} кг</div>}
-                    <div className="price-tag" style={{margin:'6px 0'}}>{Number(order.price).toLocaleString('ru-RU')} ₽</div>
-                    <div style={{fontSize:11,color:'#a1a1aa'}}><i className="bi bi-clock" style={{marginRight:4}}></i>{new Date(order.created_at).toLocaleString('ru-RU')}</div>
+                    {order.cargo_description && <div style={{fontSize:15,color:'#71717a',marginBottom:6}}><i className="bi bi-box-seam" style={{marginRight:6}}></i>{order.cargo_description}</div>}
+                    {order.cargo_weight > 0 && <div style={{fontSize:15,color:'#71717a',marginBottom:6}}>Вес: {order.cargo_weight} кг</div>}
+                    <div className="price-tag" style={{margin:'8px 0',fontSize:22,padding:'8px 14px'}}>{Number(order.price).toLocaleString('ru-RU')} ₽</div>
+                    <div style={{fontSize:14,color:'#a1a1aa'}}><i className="bi bi-clock" style={{marginRight:6}}></i>{new Date(order.created_at).toLocaleString('ru-RU')}</div>
                     {(order.driver_name || order.client_name) && (
-                        <div style={{background:'#f4f4f5',borderRadius:6,padding:'8px 10px',marginTop:8,fontSize:12}}>
-                            {order.driver_name && <div><i className="bi bi-person-check" style={{marginRight:4}}></i><strong>Водитель:</strong> {order.driver_name}</div>}
-                            {order.client_name && <div><i className="bi bi-person" style={{marginRight:4}}></i><strong>Клиент:</strong> {order.client_name}</div>}
+                        <div style={{background:'#f4f4f5',borderRadius:8,padding:'10px 12px',marginTop:10,fontSize:15}}>
+                            {order.driver_name && <div><i className="bi bi-person-check" style={{marginRight:6}}></i><strong>Водитель:</strong> {order.driver_name}</div>}
+                            {order.client_name && <div><i className="bi bi-person" style={{marginRight:6}}></i><strong>Клиент:</strong> {order.client_name}</div>}
                         </div>
                     )}
                     <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
