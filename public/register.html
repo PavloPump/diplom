@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#09090b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DeliveryCarGo">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <title>Регистрация — DeliveryCarGo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+<div class="auth-shell">
+    <aside class="auth-brand">
+        <div class="auth-brand-top"><i class="bi bi-truck"></i><span>DeliveryCarGo</span></div>
+        <div class="auth-brand-hero">
+            <h1>Присоединяйтесь к&nbsp;DeliveryCarGo</h1>
+            <p>Создайте аккаунт за 30 секунд и&nbsp;начните отправлять или принимать заказы прямо сейчас.</p>
+            <div class="auth-feats">
+                <div class="auth-feat"><i class="bi bi-people-fill"></i><span>Сообщество клиентов и&nbsp;водителей</span></div>
+                <div class="auth-feat"><i class="bi bi-cash-coin"></i><span>Прозрачная стоимость без скрытых комиссий</span></div>
+                <div class="auth-feat"><i class="bi bi-phone"></i><span>Удобное мобильное приложение</span></div>
+            </div>
+        </div>
+        <div class="auth-brand-foot">© DeliveryCarGo</div>
+    </aside>
+
+    <main class="auth-main">
+        <div class="auth-topbar">
+            <a href="index.html" class="auth-back"><i class="bi bi-arrow-left"></i>На главную</a>
+            <div class="auth-mobile-logo"><i class="bi bi-truck"></i><span>DeliveryCarGo</span></div>
+        </div>
+
+        <div class="auth-card">
+            <div class="auth-head">
+                <h2>Создать аккаунт</h2>
+                <p>Заполните данные, чтобы начать пользоваться сервисом</p>
+            </div>
+
+            <div id="message"></div>
+
+            <form id="registerForm" class="auth-form" novalidate>
+                <div class="field">
+                    <label for="full_name">ФИО</label>
+                    <input id="full_name" type="text" autocomplete="name" placeholder="Иванов Иван Иванович" required>
+                </div>
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input id="email" type="email" autocomplete="email" placeholder="example@mail.com" required>
+                </div>
+                <div class="field">
+                    <label for="phone">Телефон</label>
+                    <input id="phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67">
+                </div>
+                <div class="field">
+                    <label for="password">Пароль</label>
+                    <div class="field-pass">
+                        <input id="password" type="password" autocomplete="new-password" placeholder="Минимум 6 символов" required minlength="6">
+                        <button type="button" class="toggle-pass" aria-label="Показать пароль" onclick="togglePass()"><i class="bi bi-eye" id="eye"></i></button>
+                    </div>
+                    <div class="field-hint">Используйте буквы и цифры — минимум 6 символов</div>
+                </div>
+
+                <div class="role-group">
+                    <span class="role-label">Я хочу</span>
+                    <div class="role-segment">
+                        <button type="button" class="active" data-role="client" onclick="setRole(this)"><i class="bi bi-box-seam"></i>Отправлять</button>
+                        <button type="button" data-role="driver" onclick="setRole(this)"><i class="bi bi-truck"></i>Возить</button>
+                    </div>
+                    <input type="hidden" id="role" value="client">
+                </div>
+
+                <button type="submit" class="btn-primary" id="regBtn">Зарегистрироваться</button>
+            </form>
+
+            <div class="auth-foot">Уже есть аккаунт? <a href="login.html">Войти</a></div>
+        </div>
+    </main>
+</div>
+
+<script>
+function togglePass(){
+    const i=document.getElementById('password'),e=document.getElementById('eye');
+    if(i.type==='password'){i.type='text';e.className='bi bi-eye-slash';}
+    else{i.type='password';e.className='bi bi-eye';}
+}
+function setRole(btn){
+    document.querySelectorAll('.role-segment button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('role').value=btn.dataset.role;
+}
+function showMsg(text,type){
+    const el=document.getElementById('message');
+    const cls=type==='error'?'alert-error':'alert-success';
+    const icon=type==='error'?'bi-exclamation-circle':'bi-check-circle';
+    el.innerHTML=`<div class="alert ${cls}"><i class="bi ${icon}"></i><span></span></div>`;
+    el.querySelector('span').textContent=text;
+}
+document.getElementById('registerForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('regBtn');
+    const pass=document.getElementById('password').value;
+    if(pass.length<6){showMsg('Пароль должен быть не короче 6 символов','error');return;}
+    btn.disabled=true; btn.innerHTML='<span class="btn-spinner"></span>Создаём...';
+    document.getElementById('message').innerHTML='';
+    const fd=new FormData();
+    fd.append('action','register');
+    fd.append('full_name',document.getElementById('full_name').value.trim());
+    fd.append('email',document.getElementById('email').value.trim());
+    fd.append('phone',document.getElementById('phone').value.trim());
+    fd.append('password',pass);
+    fd.append('role',document.getElementById('role').value);
+    try{
+        const r=await fetch('../api/auth.php',{method:'POST',body:fd});
+        const d=await r.json();
+        if(d.success){showMsg('Аккаунт создан! Перенаправляем на вход...','success');setTimeout(()=>location.href='login.html',900);}
+        else{showMsg(d.message||'Ошибка регистрации','error');btn.disabled=false;btn.textContent='Зарегистрироваться';}
+    }catch(_){showMsg('Ошибка соединения с сервером','error');btn.disabled=false;btn.textContent='Зарегистрироваться';}
+});
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>

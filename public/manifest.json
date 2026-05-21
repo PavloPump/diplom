@@ -1,0 +1,21 @@
+{
+  "name": "DeliveryCarGo",
+  "short_name": "DeliveryCarGo",
+  "description": "Быстрая и надёжная доставка грузов",
+  "lang": "ru",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#09090b",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

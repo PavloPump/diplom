@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#09090b"/>
+  <g fill="#ffffff" transform="translate(74 150)">
+    <!-- Stylised truck -->
+    <path d="M0 28c0-15.5 12.5-28 28-28h184v200H0V28zm226 28h74c12 0 23 5 31 14l32 36c8 9 13 21 13 33v89c0 15.5-12.5 28-28 28h-22a40 40 0 11-80 0h-20V56zm-130 184a40 40 0 1180 0 40 40 0 01-80 0zm160 0a40 40 0 1180 0 40 40 0 01-80 0z"/>
+  </g>
+</svg>

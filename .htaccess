@@ -1,0 +1,4 @@
+RewriteEngine On
+# Redirect project root to public/
+RewriteRule ^$ public/ [L,R=302]
+RewriteRule ^index\.html$ public/ [L,R=302]

@@ -1,0 +1,298 @@
+/* Extended Styles for DeliveryCarGo */
+
+/* === Stepper === */
+.stepper-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0 28px;
+  gap: 0;
+}
+
+.stepper-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #e4e4e7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a1a1aa;
+  background: #fff;
+  transition: all 0.3s;
+}
+
+.stepper-dot.active,
+.stepper-dot.done {
+  background: #09090b;
+  color: #fff;
+  border-color: #09090b;
+  transform: scale(1.1);
+}
+
+.stepper-bar {
+  width: 40px;
+  height: 2px;
+  background: #e4e4e7;
+  transition: background 0.3s;
+}
+
+.stepper-bar.done {
+  background: #09090b;
+}
+
+/* === DaData Suggestions === */
+.dadata-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dadata-suggestions li {
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #f4f4f5;
+  transition: background 0.2s;
+}
+
+.dadata-suggestions li:last-child {
+  border-bottom: none;
+}
+
+.dadata-suggestions li:hover {
+  background: #f4f4f5;
+}
+
+/* === Price Components === */
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #f4f4f5;
+}
+
+.price-row:last-child {
+  border-bottom: none;
+}
+
+.price-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  font-weight: 700;
+  color: #09090b;
+  border-top: 2px solid #e4e4e7;
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.price-tag {
+  font-size: 20px;
+  font-weight: 700;
+  color: #09090b;
+  margin: 8px 0;
+}
+
+/* === Option Grid === */
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.opt-card {
+  border: 2px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 16px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.opt-card:hover {
+  border-color: #09090b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.opt-card.sel {
+  border-color: #09090b;
+  background: #f4f4f5;
+}
+
+.opt-card i {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 8px;
+  color: #71717a;
+}
+
+.opt-card.sel i {
+  color: #09090b;
+}
+
+.opt-card .opt-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #09090b;
+  margin-bottom: 4px;
+}
+
+.opt-card .opt-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #09090b;
+}
+
+/* === Route Info === */
+.route-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 16px;
+  background: #f4f4f5;
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
+  margin: 12px 0;
+}
+
+.route-info-grid .ri-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #09090b;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.route-info-grid .ri-lbl {
+  font-size: 11px;
+  color: #71717a;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+/* === Map Container === */
+#map-container {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e4e4e7;
+  background: #f4f4f5;
+}
+
+/* === Avatar === */
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #09090b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 auto 16px;
+}
+
+/* === Toast === */
+.toast {
+  background: #09090b;
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.toast.color-red {
+  background: #ef4444;
+}
+
+/* === Stat Values === */
+.stat-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: #09090b;
+  letter-spacing: -0.5px;
+  margin: 8px 0 4px;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stat-icon {
+  font-size: 24px;
+  color: #71717a;
+  margin-bottom: 8px;
+}
+
+/* === Block Title === */
+.block-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #71717a;
+  margin: 16px 0 12px;
+}
+
+/* === Preloader === */
+.preloader {
+  --f7-preloader-color: #09090b;
+}
+
+/* === List Improvements === */
+.list input,
+.list textarea,
+.list select {
+  color: #09090b;
+  font-size: 15px;
+}
+
+.list input::placeholder {
+  color: #a1a1aa;
+}
+
+.list .item-inner {
+  padding-right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* === Responsive Improvements === */
+@media (min-width: 768px) {
+  .option-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .order-card {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

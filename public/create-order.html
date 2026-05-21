@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru" class="ios">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Новый заказ - DeliveryCarGo</title>
+    <link rel="stylesheet" href="framework7.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="f7-custom.css">
+    <link rel="stylesheet" href="f7-extended.css">
+    <style>*{font-family:'Inter',sans-serif}</style>
+</head>
+<body>
+    <div id="app"></div>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=485cdea2-4f3a-4f5a-b0ad-9251c4962490&lang=ru_RU" type="text/javascript"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+const DADATA_TOKEN = '804fe2318870082d27e18b9bda5d241d4d3d549d';
+const DADATA_URL   = 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
+const YANDEX_GEOCODE_URL = 'https://geocode-maps.yandex.ru/1.x/';
+const YANDEX_API_KEY = '485cdea2-4f3a-4f5a-b0ad-9251c4962490';
+
+// ─── Price config ────────────────────────────────────────────────────────────
+const PRICE = {
+    base: 300,            // базовая стоимость
+    perKm: 25,            // за км
+    weightRates: [        // пороги веса
+        { max: 10,   mult: 1.0 },
+        { max: 50,   mult: 1.3 },
+        { max: 200,  mult: 1.6 },
+        { max: 500,  mult: 2.0 },
+        { max: Infinity, mult: 2.5 }
+    ],
+    dimensionRate: 0.5,   // за каждый куб.м сверх 1
+    options: {
+        fragile:    { label: 'Хрупкий груз',       icon: 'bi-exclamation-diamond', price: 500 },
+        express:    { label: 'Экспресс доставка',   icon: 'bi-lightning-charge',    price: 800 },
+        insurance:  { label: 'Страхование',         icon: 'bi-shield-check',        price: 400 },
+        loading:    { label: 'Погрузка/Разгрузка',  icon: 'bi-people',              price: 600 },
+    }
+};
+
+function calcPrice(distanceKm, weightKg, volumeM3, selectedOptions) {
+    let total = PRICE.base;
+    total += distanceKm * PRICE.perKm;
+    const wRate = PRICE.weightRates.find(r => weightKg <= r.max) || PRICE.weightRates[PRICE.weightRates.length - 1];
+    total *= wRate.mult;
+    if (volumeM3 > 1) total += (volumeM3 - 1) * PRICE.dimensionRate * 1000;
+    for (const opt of selectedOptions) {
+        if (PRICE.options[opt]) total += PRICE.options[opt].price;
+    }
+    return Math.round(total);
+}
+
+// ─── API helper ──────────────────────────────────────────────────────────────
+const api = {
+    async request(url, data = {}) {
+        const fd = new FormData();
+        for (const k in data) fd.append(k, data[k]);
+        const r = await fetch(url, { method: 'POST', body: fd });
+        return r.json();
+    }
+};
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let _toastAdd = null;
+function showToast(msg, type = 'success') { if (_toastAdd) _toastAdd(msg, type); }
+function ToastContainer() {
+    const [toasts, setToasts] = useState([]);
+    const counter = useRef(0);
+    useEffect(() => {
+        _toastAdd = (msg, type) => {
+            const id = ++counter.current;
+            setToasts(p => [...p, { id, msg, type }]);
+            setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3000);
+        };
+        return () => { _toastAdd = null; };
+    }, []);
+    return (
+        <div style={{position:'fixed',top:12,left:12,right:12,zIndex:99999}}>
+            {toasts.map(t => (
+                <div key={t.id} className={'toast toast-opened' + (t.type==='error'?' color-red':'')}
+                     style={{position:'relative',marginBottom:8}}>
+                    <div className="toast-content">{t.msg}</div>
+                    <button className="toast-close-button" onClick={()=>setToasts(p=>p.filter(x=>x.id!==t.id))}></button>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// ─── Time formatter ──────────────────────────────────────────────────────────
+function formatTime(minutes) {
+    const mins = Math.round(minutes);
+    if (mins >= 1440) {
+        const days = Math.round(mins / 1440);
+        return days + ' ' + (days === 1 ? 'день' : (days >= 2 && days <= 4) ? 'дня' : 'дней');
+    }
+    if (mins >= 60) {
+        const hours = Math.floor(mins / 60);
+        const m = mins % 60;
+        const hLabel = hours + ' ' + (hours === 1 ? 'час' : (hours >= 2 && hours <= 4) ? 'часа' : 'часов');
+        return m > 0 ? hLabel + ' ' + m + ' мин' : hLabel;
+    }
+    return mins + ' мин';
+}
+
+// ─── DaData Address Input ────────────────────────────────────────────────────
+function AddressInput({ value, onChange, onSelect, placeholder, required }) {
+    const [suggestions, setSuggestions] = useState([]);
+    const [show, setShow] = useState(false);
+    const wrapRef = useRef(null);
+    const debounceRef = useRef(null);
+
+    const fetchSuggestions = (query) => {
+        clearTimeout(debounceRef.current);
+        if (!query || query.length < 3) { setSuggestions([]); return; }
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const r = await fetch(DADATA_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Token ' + DADATA_TOKEN },
+                    body: JSON.stringify({ query, count: 5 })
+                });
+                const data = await r.json();
+                setSuggestions(data.suggestions || []);
+                setShow(true);
+            } catch (e) { setSuggestions([]); }
+        }, 300);
+    };
+
+    const handleSelect = (s) => {
+        onChange(s.value);
+        if (onSelect) onSelect(s);
+        setSuggestions([]);
+        setShow(false);
+    };
+
+    useEffect(() => {
+        const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setShow(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={wrapRef} style={{position:'relative'}}>
+            <div style={{position:'relative'}}>
+                <input 
+                    type="text" 
+                    placeholder={placeholder} 
+                    value={value} 
+                    autoComplete="off"
+                    onChange={e=>{onChange(e.target.value);fetchSuggestions(e.target.value);}}
+                    onFocus={()=>{if(suggestions.length)setShow(true);}}
+                    required={required}
+                    style={{
+                        width:'100%',
+                        padding:'14px 16px',
+                        fontSize:'15px',
+                        border:'1px solid #e4e4e7',
+                        borderRadius:'10px',
+                        background:'#fff',
+                        color:'#09090b',
+                        outline:'none',
+                        transition:'all 0.2s'
+                    }}
+                />
+                {value && (
+                    <button 
+                        type="button"
+                        onClick={()=>{onChange('');setSuggestions([]);}}
+                        style={{
+                            position:'absolute',
+                            right:'12px',
+                            top:'50%',
+                            transform:'translateY(-50%)',
+                            background:'none',
+                            border:'none',
+                            color:'#a1a1aa',
+                            cursor:'pointer',
+                            fontSize:'18px',
+                            padding:'4px'
+                        }}
+                    >
+                        <i className="bi bi-x-lg"></i>
+                    </button>
+                )}
+            </div>
+            {show && suggestions.length > 0 && (
+                <ul className="dadata-suggestions">
+                    {suggestions.map((s, i) => (
+                        <li key={i} onMouseDown={() => handleSelect(s)}>
+                            <i className="bi bi-geo-alt-fill" style={{color:'#09090b',marginRight:8}}></i>{s.value}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+// ─── Yandex Map ──────────────────────────────────────────────────────────────
+function YandexRouteMap({ fromCoords, toCoords, onRouteReady }) {
+    const mapRef = useRef(null);
+    const mapInstance = useRef(null);
+    const routeRef = useRef(null);
+
+    useEffect(() => {
+        if (!fromCoords || !toCoords) return;
+        const init = () => {
+            if (!mapInstance.current) {
+                mapInstance.current = new ymaps.Map(mapRef.current, {
+                    center: fromCoords, zoom: 10,
+                    controls: ['zoomControl']
+                });
+            }
+            if (routeRef.current) {
+                mapInstance.current.geoObjects.remove(routeRef.current);
+            }
+            ymaps.route([fromCoords, toCoords], { mapStateAutoApply: true }).then(route => {
+                routeRef.current = route;
+                mapInstance.current.geoObjects.add(route);
+                const distM = route.getLength();
+                const timeSec = route.getJamsTime();
+                if (onRouteReady) onRouteReady({ distanceKm: distM / 1000, timeMin: timeSec / 60 });
+            }).catch(() => {
+                if (onRouteReady) onRouteReady(null);
+            });
+        };
+        if (window.ymaps && window.ymaps.ready) {
+            ymaps.ready(init);
+        }
+    }, [fromCoords, toCoords]);
+
+    return <div ref={mapRef} id="map-container"></div>;
+}
+
+// ─── Geocode helper ──────────────────────────────────────────────────────────
+async function geocodeAddress(address) {
+    try {
+        const url = `${YANDEX_GEOCODE_URL}?apikey=${YANDEX_API_KEY}&geocode=${encodeURIComponent(address)}&format=json&results=1`;
+        const r = await fetch(url);
+        const data = await r.json();
+        const pos = data.response.GeoObjectCollection.featureMember[0]?.GeoObject.Point.pos;
+        if (!pos) return null;
+        const [lng, lat] = pos.split(' ').map(Number);
+        return [lat, lng];
+    } catch { return null; }
+}
+
+// ─── Stepper component ───────────────────────────────────────────────────────
+function Stepper({ steps, current }) {
+    return (
+        <div className="stepper-row">
+            {steps.map((s, i) => (
+                <React.Fragment key={i}>
+                    {i > 0 && <div className={'stepper-bar' + (i <= current ? ' done' : '')}></div>}
+                    <div style={{textAlign:'center'}}>
+                        <div className={'stepper-dot' + (i === current ? ' active' : '') + (i < current ? ' done' : '')}>
+                            {i < current ? <i className="bi bi-check-lg"></i> : i + 1}
+                        </div>
+                        <div style={{fontSize:10,color:i<=current?'#09090b':'#a1a1aa',marginTop:4,fontWeight:500}}>{s}</div>
+                    </div>
+                </React.Fragment>
+            ))}
+        </div>
+    );
+}
+
+// ─── Main Create Order App ───────────────────────────────────────────────────
+function CreateOrderApp() {
+    const [step, setStep] = useState(0);
+    const [pickup, setPickup] = useState('');
+    const [delivery, setDelivery] = useState('');
+    const [pickupCoords, setPickupCoords] = useState(null);
+    const [deliveryCoords, setDeliveryCoords] = useState(null);
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [loadingRoute, setLoadingRoute] = useState(false);
+
+    const [cargoType, setCargoType] = useState('');
+    const [cargoWeight, setCargoWeight] = useState('');
+    const [cargoDimL, setCargoDimL] = useState('');
+    const [cargoDimW, setCargoDimW] = useState('');
+    const [cargoDimH, setCargoDimH] = useState('');
+    const [selectedOptions, setSelectedOptions] = useState([]);
+
+    const [submitting, setSubmitting] = useState(false);
+
+    const steps = ['Маршрут', 'Груз', 'Опции', 'Подтверждение'];
+
+    // Geocode when address is selected
+    const handlePickupSelect = async (s) => {
+        setPickup(s.value);
+        setLoadingRoute(true);
+        const coords = await geocodeAddress(s.value);
+        setPickupCoords(coords);
+        setLoadingRoute(false);
+    };
+
+    const handleDeliverySelect = async (s) => {
+        setDelivery(s.value);
+        setLoadingRoute(true);
+        const coords = await geocodeAddress(s.value);
+        setDeliveryCoords(coords);
+        setLoadingRoute(false);
+    };
+
+    // Volume in m³
+    const volumeM3 = (parseFloat(cargoDimL) || 0) * (parseFloat(cargoDimW) || 0) * (parseFloat(cargoDimH) || 0);
+    const weightKg = parseFloat(cargoWeight) || 0;
+    const distanceKm = routeInfo ? routeInfo.distanceKm : 0;
+    const price = calcPrice(distanceKm, weightKg, volumeM3, selectedOptions);
+
+    const toggleOption = (key) => {
+        setSelectedOptions(prev => prev.includes(key) ? prev.filter(o => o !== key) : [...prev, key]);
+    };
+
+    const canProceed = (s) => {
+        if (s === 0) {
+            const ok = pickup && delivery;
+            console.log('canProceed(0):', ok, 'pickup:', pickup, 'delivery:', delivery);
+            return ok;
+        }
+        if (s === 1) return cargoType && cargoWeight;
+        return true;
+    };
+
+    const handleSubmit = async () => {
+        setSubmitting(true);
+        const dims = (cargoDimL && cargoDimW && cargoDimH) ? `${cargoDimL}×${cargoDimW}×${cargoDimH}` : '';
+        const r = await api.request('../api/orders.php', {
+            action: 'create',
+            pickup_address: pickup,
+            delivery_address: delivery,
+            cargo_description: cargoType + (selectedOptions.length ? ' | Опции: ' + selectedOptions.map(o => PRICE.options[o].label).join(', ') : ''),
+            cargo_weight: cargoWeight,
+            cargo_dimensions: dims,
+            price: price
+        });
+        setSubmitting(false);
+        if (r.success) {
+            showToast('Заказ успешно создан!', 'success');
+            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+        } else {
+            showToast(r.message || 'Ошибка', 'error');
+        }
+    };
+
+    return (
+        <div className="page">
+            <div className="navbar">
+                <div className="navbar-bg"></div>
+                <div className="navbar-inner">
+                    <div className="left"><a href="index.html" style={{color:'#09090b',textDecoration:'none',fontSize:13}}><i className="bi bi-arrow-left" style={{marginRight:4}}></i>Назад</a></div>
+                    <div className="title">Новый заказ</div>
+                </div>
+            </div>
+            <div className="page-content" style={{paddingTop:56}}>
+                <ToastContainer />
+                <div style={{padding:'0 16px',maxWidth:800,margin:'0 auto'}}>
+                    <Stepper steps={steps} current={step} />
+
+                    {/* Step 0: Route */}
+                    {step === 0 && (
+                        <div>
+                            <div className="card" style={{marginBottom:12}}>
+                                <div className="card-header"><i className="bi bi-geo-alt" style={{marginRight:6}}></i>Маршрут доставки</div>
+                                <div className="card-content card-content-padding">
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'#71717a'}}><i className="bi bi-circle" style={{color:'#09090b',marginRight:6}}></i>Откуда забрать</div>
+                                        <AddressInput placeholder="Введите адрес отправления..." value={pickup}
+                                            onChange={v => { setPickup(v); setPickupCoords(null); setRouteInfo(null); }}
+                                            onSelect={handlePickupSelect} required />
+                                        {pickupCoords && <div style={{fontSize:12,color:'#09090b',marginTop:6}}><i className="bi bi-check-circle" style={{marginRight:4}}></i>Адрес распознан</div>}
+                                    </div>
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'#71717a'}}><i className="bi bi-geo-alt-fill" style={{color:'#09090b',marginRight:6}}></i>Куда доставить</div>
+                                        <AddressInput placeholder="Введите адрес доставки..." value={delivery}
+                                            onChange={v => { setDelivery(v); setDeliveryCoords(null); setRouteInfo(null); }}
+                                            onSelect={handleDeliverySelect} required />
+                                        {deliveryCoords && <div style={{fontSize:12,color:'#09090b',marginTop:6}}><i className="bi bi-check-circle" style={{marginRight:4}}></i>Адрес распознан</div>}
+                                    </div>
+
+                                    {loadingRoute && (
+                                        <div style={{textAlign:'center',padding:'20px 0'}}>
+                                            <div className="preloader"></div>
+                                            <div style={{fontSize:13,color:'#71717a',marginTop:8}}>Определяем координаты...</div>
+                                        </div>
+                                    )}
+
+                                    {pickupCoords && deliveryCoords && (
+                                        <div style={{marginBottom:12}}>
+                                            <YandexRouteMap fromCoords={pickupCoords} toCoords={deliveryCoords}
+                                                onRouteReady={(info) => setRouteInfo(info)} />
+                                        </div>
+                                    )}
+
+                                    {routeInfo && (
+                                        <div className="route-info-grid">
+                                            <div>
+                                                <div className="ri-val"><i className="bi bi-signpost-2" style={{marginRight:4}}></i>{routeInfo.distanceKm.toFixed(1)} км</div>
+                                                <div className="ri-lbl">Расстояние</div>
+                                            </div>
+                                            <div>
+                                                <div className="ri-val"><i className="bi bi-clock" style={{marginRight:4}}></i>{formatTime(routeInfo.timeMin)}</div>
+                                                <div className="ri-lbl">Время в пути</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'flex-end',marginBottom:16}}>
+                                <button className="button button-fill button-large" disabled={!(pickup && delivery)} onClick={() => setStep(1)}>
+                                    Далее <i className="bi bi-arrow-right" style={{marginLeft:6}}></i>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 1: Cargo */}
+                    {step === 1 && (
+                        <div>
+                            <div className="card" style={{marginBottom:12}}>
+                                <div className="card-header"><i className="bi bi-box-seam" style={{marginRight:6}}></i>Информация о грузе</div>
+                                <div className="card-content card-content-padding">
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,color:'#71717a',marginBottom:8}}>Тип груза</div>
+                                        <select 
+                                            value={cargoType} 
+                                            onChange={e => setCargoType(e.target.value)} 
+                                            required
+                                            style={{
+                                                width:'100%',
+                                                padding:'14px 16px',
+                                                fontSize:'15px',
+                                                border:'1px solid #e4e4e7',
+                                                borderRadius:'10px',
+                                                background:'#fff',
+                                                color:'#09090b',
+                                                outline:'none',
+                                                transition:'all 0.2s'
+                                            }}
+                                        >
+                                            <option value="">Выберите тип...</option>
+                                            <option value="Документы">Документы</option>
+                                            <option value="Электроника">Электроника</option>
+                                            <option value="Мебель">Мебель</option>
+                                            <option value="Стройматериалы">Стройматериалы</option>
+                                            <option value="Продукты питания">Продукты питания</option>
+                                            <option value="Одежда и текстиль">Одежда и текстиль</option>
+                                            <option value="Оборудование">Оборудование</option>
+                                            <option value="Другое">Другое</option>
+                                        </select>
+                                    </div>
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,color:'#71717a',marginBottom:8}}><i className="bi bi-speedometer" style={{marginRight:4}}></i>Вес (кг)</div>
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            min="0.1" 
+                                            placeholder="Укажите вес"
+                                            value={cargoWeight} 
+                                            onChange={e => setCargoWeight(e.target.value)} 
+                                            required
+                                            style={{
+                                                width:'100%',
+                                                padding:'14px 16px',
+                                                fontSize:'15px',
+                                                border:'1px solid #e4e4e7',
+                                                borderRadius:'10px',
+                                                background:'#fff',
+                                                color:'#09090b',
+                                                outline:'none',
+                                                transition:'all 0.2s'
+                                            }}
+                                        />
+                                    </div>
+                                    {weightKg > 0 && (
+                                        <div style={{fontSize:12,color:'#71717a',marginBottom:12}}>
+                                            Коэффициент веса: x{(PRICE.weightRates.find(r => weightKg <= r.max) || PRICE.weightRates[PRICE.weightRates.length - 1]).mult}
+                                        </div>
+                                    )}
+                                    <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'#71717a'}}><i className="bi bi-rulers" style={{marginRight:4}}></i>Габариты (м)</div>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            min="0" 
+                                            placeholder="Длина" 
+                                            value={cargoDimL} 
+                                            onChange={e => setCargoDimL(e.target.value)}
+                                            style={{
+                                                padding:'12px',
+                                                border:'1px solid #e4e4e7',
+                                                borderRadius:'8px',
+                                                fontSize:'14px',
+                                                width:'100%',
+                                                outline:'none',
+                                                transition:'all 0.2s'
+                                            }}
+                                        />
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            min="0" 
+                                            placeholder="Ширина" 
+                                            value={cargoDimW} 
+                                            onChange={e => setCargoDimW(e.target.value)}
+                                            style={{
+                                                padding:'12px',
+                                                border:'1px solid #e4e4e7',
+                                                borderRadius:'8px',
+                                                fontSize:'14px',
+                                                width:'100%',
+                                                outline:'none',
+                                                transition:'all 0.2s'
+                                            }}
+                                        />
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            min="0" 
+                                            placeholder="Высота" 
+                                            value={cargoDimH} 
+                                            onChange={e => setCargoDimH(e.target.value)}
+                                            style={{
+                                                padding:'12px',
+                                                border:'1px solid #e4e4e7',
+                                                borderRadius:'8px',
+                                                fontSize:'14px',
+                                                width:'100%',
+                                                outline:'none',
+                                                transition:'all 0.2s'
+                                            }}
+                                        />
+                                    </div>
+                                    {volumeM3 > 0 && <div style={{fontSize:12,color:'#71717a'}}>Объём: {volumeM3.toFixed(2)} м³</div>}
+                                </div>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+                                <button className="button button-outline button-large" onClick={() => setStep(0)}>
+                                    <i className="bi bi-arrow-left" style={{marginRight:6}}></i>Назад
+                                </button>
+                                <button className="button button-fill button-large" disabled={!canProceed(1)} onClick={() => setStep(2)}>
+                                    Далее <i className="bi bi-arrow-right" style={{marginLeft:6}}></i>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Options */}
+                    {step === 2 && (
+                        <div>
+                            <div className="card" style={{marginBottom:12}}>
+                                <div className="card-header"><i className="bi bi-sliders" style={{marginRight:6}}></i>Дополнительные опции</div>
+                                <div className="card-content card-content-padding">
+                                    <div style={{fontSize:13,color:'#71717a',marginBottom:12}}>Выберите нужные дополнительные услуги (необязательно)</div>
+                                    <div className="option-grid">
+                                        {Object.entries(PRICE.options).map(([key, opt]) => (
+                                            <div key={key} className={'opt-card' + (selectedOptions.includes(key) ? ' sel' : '')}
+                                                onClick={() => toggleOption(key)}>
+                                                <i className={'bi ' + opt.icon}></i>
+                                                <div className="opt-label">{opt.label}</div>
+                                                <div className="opt-price">+{opt.price} ₽</div>
+                                                {selectedOptions.includes(key) && <i className="bi bi-check-circle-fill" style={{fontSize:16,marginTop:4}}></i>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="card" style={{marginBottom:12}}>
+                                <div className="card-header" style={{background:'#09090b',color:'#fff'}}><i className="bi bi-calculator" style={{marginRight:6}}></i>Предварительная стоимость</div>
+                                <div className="card-content card-content-padding">
+                                    <div className="price-row"><span>Базовая стоимость</span><span>{PRICE.base} ₽</span></div>
+                                    <div className="price-row"><span>Расстояние ({distanceKm.toFixed(1)} км × {PRICE.perKm} ₽)</span><span>{Math.round(distanceKm * PRICE.perKm)} ₽</span></div>
+                                    <div className="price-row"><span>Коэффициент веса ({weightKg} кг)</span><span>×{(PRICE.weightRates.find(r => weightKg <= r.max) || PRICE.weightRates[PRICE.weightRates.length - 1]).mult}</span></div>
+                                    {volumeM3 > 1 && <div className="price-row"><span>Объём (+{(volumeM3 - 1).toFixed(2)} м³)</span><span>+{Math.round((volumeM3 - 1) * PRICE.dimensionRate * 1000)} ₽</span></div>}
+                                    {selectedOptions.map(key => (
+                                        <div key={key} className="price-row"><span>{PRICE.options[key].label}</span><span>+{PRICE.options[key].price} ₽</span></div>
+                                    ))}
+                                    <div className="price-total">
+                                        <span>Итого</span>
+                                        <span>{price.toLocaleString('ru-RU')} ₽</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+                                <button className="button button-outline button-large" onClick={() => setStep(1)}>
+                                    <i className="bi bi-arrow-left" style={{marginRight:6}}></i>Назад
+                                </button>
+                                <button className="button button-fill button-large" onClick={() => setStep(3)}>
+                                    Далее <i className="bi bi-arrow-right" style={{marginLeft:6}}></i>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 3: Confirmation */}
+                    {step === 3 && (
+                        <div>
+                            <div className="card" style={{marginBottom:12}}>
+                                <div className="card-header"><i className="bi bi-clipboard-check" style={{marginRight:6}}></i>Подтверждение заказа</div>
+                                <div className="card-content card-content-padding">
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,color:'#71717a',marginBottom:8}}><i className="bi bi-signpost-2" style={{marginRight:4}}></i>Маршрут</div>
+                                        <div style={{fontSize:14,marginBottom:4}}><strong>Откуда:</strong> {pickup}</div>
+                                        <div style={{fontSize:14,marginBottom:4}}><strong>Куда:</strong> {delivery}</div>
+                                        <div style={{fontSize:12,color:'#71717a'}}>{distanceKm.toFixed(1)} км • ~{routeInfo ? formatTime(routeInfo.timeMin) : '—'}</div>
+                                    </div>
+
+                                    <div style={{marginBottom:16}}>
+                                        <div style={{fontSize:13,fontWeight:600,color:'#71717a',marginBottom:8}}><i className="bi bi-box-seam" style={{marginRight:4}}></i>Груз</div>
+                                        <div style={{fontSize:14,marginBottom:4}}><strong>Тип:</strong> {cargoType}</div>
+                                        <div style={{fontSize:14,marginBottom:4}}><strong>Вес:</strong> {cargoWeight} кг</div>
+                                        {volumeM3 > 0 && <div style={{fontSize:14}}><strong>Габариты:</strong> {cargoDimL}×{cargoDimW}×{cargoDimH} м ({volumeM3.toFixed(2)} м³)</div>}
+                                    </div>
+
+                                    {selectedOptions.length > 0 && (
+                                        <div style={{marginBottom:16}}>
+                                            <div style={{fontSize:13,fontWeight:600,color:'#71717a',marginBottom:8}}><i className="bi bi-sliders" style={{marginRight:4}}></i>Доп. услуги</div>
+                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                {selectedOptions.map(key => (
+                                                    <span key={key} className="badge"><i className={'bi ' + PRICE.options[key].icon} style={{marginRight:4}}></i>{PRICE.options[key].label}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {pickupCoords && deliveryCoords && (
+                                        <div style={{marginBottom:12}}>
+                                            <YandexRouteMap fromCoords={pickupCoords} toCoords={deliveryCoords} onRouteReady={() => {}} />
+                                        </div>
+                                    )}
+
+                                    <div style={{background:'#09090b',color:'#fff',borderRadius:8,padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:16,marginTop:12}}>
+                                        <span><i className="bi bi-cash-coin" style={{marginRight:6}}></i><strong>Стоимость доставки</strong></span>
+                                        <span style={{fontWeight:700}}>{price.toLocaleString('ru-RU')} ₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+                                <button className="button button-outline button-large" onClick={() => setStep(2)}>
+                                    <i className="bi bi-arrow-left" style={{marginRight:6}}></i>Назад
+                                </button>
+                                <button className="button button-fill button-large" disabled={submitting} onClick={handleSubmit} style={{background:'#09090b'}}>
+                                    {submitting && <span className="preloader preloader-white" style={{width:16,height:16,marginRight:6}}></span>}
+                                    <i className="bi bi-check-circle" style={{marginRight:6}}></i>Оформить заказ
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('app'));
+root.render(<CreateOrderApp />);
+    </script>
+</body>
+</html>
