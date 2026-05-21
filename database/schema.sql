@@ -83,6 +83,41 @@ CREATE TABLE notifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Таблица чатов
+CREATE TABLE IF NOT EXISTS chats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('order', 'support') NOT NULL,
+    order_id INT NULL,
+    participant1_id INT NOT NULL,
+    participant2_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_order (order_id),
+    INDEX idx_participants (participant1_id, participant2_id)
+);
+
+-- Таблица сообщений
+CREATE TABLE IF NOT EXISTS messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chat_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    message TEXT,
+    file_path VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    file_type VARCHAR(100) NULL,
+    file_size INT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_chat (chat_id),
+    INDEX idx_sender (sender_id),
+    INDEX idx_created (created_at)
+);
+
 -- Вставка администратора по умолчанию
 INSERT INTO users (email, password, full_name, phone, role) 
 VALUES ('admin@deliverycargo.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Администратор', '+79000000000', 'admin');

@@ -40,10 +40,10 @@ body{margin:0;background:var(--bg);font-family:'Inter',-apple-system,BlinkMacSys
 .field input{height:46px;padding:0 14px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px;color:var(--primary);font-family:inherit;transition:border-color .15s,box-shadow .15s}
 .field input::placeholder{color:#a1a1aa}
 .field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(9,9,11,.08)}
-.field-pass{position:relative}
-.field-pass .toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;border-radius:6px;display:flex}
+.field-pass{position:relative;display:flex;align-items:center}
+.field-pass input{flex:1;padding-right:48px !important}
+.field-pass .toggle-pass{position:absolute;right:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center}
 .field-pass .toggle-pass:hover{color:var(--primary);background:var(--light)}
-.field-pass input{padding-right:42px}
 
 .role-group{display:flex;flex-direction:column;gap:6px}
 .role-group .role-label{font-size:13px;font-weight:500}

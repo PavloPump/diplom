@@ -124,14 +124,537 @@ function StatusBadge({ status }) {
 function ConfirmDialog({ show, title, message, onConfirm, onCancel, danger }) {
     if (!show) return null;
     return (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:99998,display:'flex',alignItems:'center',justifyContent:'center'}}
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:99998,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
              onClick={onCancel}>
-            <div className="card" style={{width:280,margin:0}} onClick={e=>e.stopPropagation()}>
-                <div className="card-header" style={{fontWeight:600}}>{title||'Подтверждение'}</div>
-                <div className="card-content card-content-padding"><p style={{margin:0}}>{message}</p></div>
-                <div className="card-footer" style={{justifyContent:'flex-end',gap:8}}>
-                    <button className="button button-outline" onClick={onCancel}>Отмена</button>
-                    <button className={'button button-fill' + (danger?' color-red':'')} onClick={onConfirm}>Подтвердить</button>
+            <div className="card" style={{width:'100%',maxWidth:420,margin:0}} onClick={e=>e.stopPropagation()}>
+                <div className="card-header" style={{fontWeight:700,fontSize:18}}>{title||'Подтверждение'}</div>
+                <div className="card-content card-content-padding" style={{padding:20}}>
+                    <p style={{margin:0,fontSize:15,lineHeight:1.6,color:'var(--text-muted)'}}>{message}</p>
+                </div>
+                <div className="card-footer" style={{justifyContent:'flex-end',gap:12,padding:16}}>
+                    <button className="button button-outline" onClick={onCancel} style={{minWidth:100}}>Отмена</button>
+                    <button className={'button button-fill' + (danger?' color-red':'')} onClick={onConfirm} style={{minWidth:120}}>Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// === Messenger ===
+function Messenger({ userRole, userId }) {
+    const [chats, setChats] = useState([]);
+    const [activeChat, setActiveChat] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+    
+    const loadChats = async () => {
+        const r = await api.get('../api/chat.php?action=get_chats');
+        if (r.success) setChats(r.chats);
+    };
+    
+    const loadMessages = async (chatId) => {
+        const r = await api.get(`../api/chat.php?action=get_messages&chat_id=${chatId}`);
+        if (r.success) {
+            setMessages(r.messages);
+            await api.request('../api/chat.php', { action: 'mark_read', chat_id: chatId });
+            loadChats();
+        }
+    };
+    
+    const sendMessage = async (e) => {
+        e.preventDefault();
+        if ((!newMessage.trim() && !selectedFile) || !activeChat) return;
+        
+        setLoading(true);
+        const formData = new FormData();
+        formData.append('action', 'send_message');
+        formData.append('chat_id', activeChat.id);
+        formData.append('message', newMessage);
+        if (selectedFile) {
+            formData.append('file', selectedFile);
+        }
+        
+        try {
+            const response = await fetch('../api/chat.php', {
+                method: 'POST',
+                body: formData
+            });
+            const r = await response.json();
+            
+            if (r.success) {
+                setNewMessage('');
+                setSelectedFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                loadMessages(activeChat.id);
+            } else {
+                showToast(r.message, 'error');
+            }
+        } catch (err) {
+            showToast('Ошибка отправки', 'error');
+        }
+        setLoading(false);
+    };
+    
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 15 * 1024 * 1024) {
+                showToast('Файл слишком большой. Максимум 15MB', 'error');
+                e.target.value = '';
+                return;
+            }
+            setSelectedFile(file);
+        }
+    };
+    
+    const removeFile = () => {
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    
+    const formatFileSize = (bytes) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+    
+    const isImage = (type) => {
+        return type && type.startsWith('image/');
+    };
+    
+    const createSupportChat = async () => {
+        const r = await api.request('../api/chat.php', {
+            action: 'get_or_create_chat',
+            type: 'support'
+        });
+        if (r.success && r.chat) {
+            loadChats();
+            setActiveChat(r.chat);
+            loadMessages(r.chat.id);
+        }
+    };
+    
+    useEffect(() => {
+        loadChats();
+        const interval = setInterval(loadChats, 5000);
+        return () => clearInterval(interval);
+    }, []);
+    
+    useEffect(() => {
+        if (activeChat) {
+            const interval = setInterval(() => loadMessages(activeChat.id), 3000);
+            return () => clearInterval(interval);
+        }
+    }, [activeChat]);
+    
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+    
+    const getChatTitle = (chat) => {
+        if (chat.type === 'support') return 'Поддержка';
+        if (chat.type === 'order') {
+            const otherName = chat.participant1_id === userId ? chat.participant2_name : chat.participant1_name;
+            return `Заказ #${chat.order_number} — ${otherName}`;
+        }
+        return 'Чат';
+    };
+    
+    return (
+        <div className="messenger-container">
+            <div className={`messenger-sidebar ${activeChat ? 'hidden-mobile' : ''}`}>
+                <div className="card-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span><i className="bi bi-chat-dots"></i>Чаты</span>
+                    <button className="button button-small button-outline" onClick={createSupportChat}>
+                        <i className="bi bi-headset"></i>Поддержка
+                    </button>
+                </div>
+                <div style={{flex:1,overflow:'auto'}}>
+                    {chats.length === 0 ? (
+                        <div style={{padding:40,textAlign:'center',color:'var(--text-muted)'}}>
+                            <i className="bi bi-chat" style={{fontSize:48,marginBottom:12,display:'block'}}></i>
+                            Нет чатов
+                        </div>
+                    ) : (
+                        chats.map(chat => (
+                            <div key={chat.id} 
+                                onClick={() => { setActiveChat(chat); loadMessages(chat.id); }}
+                                style={{
+                                    padding:16,
+                                    borderBottom:'1px solid var(--border)',
+                                    cursor:'pointer',
+                                    background:activeChat?.id === chat.id ? 'var(--gray-100)' : 'transparent',
+                                    transition:'background 0.2s'
+                                }}>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                                    <div style={{fontWeight:600,fontSize:14}}>{getChatTitle(chat)}</div>
+                                    {chat.unread_count > 0 && (
+                                        <span className="badge" style={{background:'#000',color:'#fff',borderRadius:12,padding:'2px 8px',fontSize:11}}>
+                                            {chat.unread_count}
+                                        </span>
+                                    )}
+                                </div>
+                                {chat.last_message && (
+                                    <div style={{fontSize:13,color:'var(--text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                        {chat.last_message}
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+            
+            {activeChat && (
+                <div className={`messenger-chat ${activeChat ? 'active-mobile' : ''}`}>
+                    <div className="card-header" style={{display:'flex',alignItems:'center',gap:12}}>
+                        <button className="button button-small button-outline mobile-back-btn" onClick={() => setActiveChat(null)}>
+                            <i className="bi bi-arrow-left"></i>
+                        </button>
+                        <span style={{flex:1}}><i className="bi bi-chat-fill"></i>{getChatTitle(activeChat)}</span>
+                    </div>
+                    <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:12}}>
+                        {messages.map(msg => (
+                            <div key={msg.id} style={{
+                                display:'flex',
+                                justifyContent:msg.sender_id === userId ? 'flex-end' : 'flex-start'
+                            }}>
+                                <div style={{
+                                    maxWidth:'70%',
+                                    padding:'10px 14px',
+                                    borderRadius:12,
+                                    background:msg.sender_id === userId ? '#000' : 'var(--gray-100)',
+                                    color:msg.sender_id === userId ? '#fff' : 'var(--text)'
+                                }}>
+                                    {msg.sender_id !== userId && (
+                                        <div style={{fontSize:11,fontWeight:600,marginBottom:4,opacity:0.7}}>
+                                            {msg.sender_name}
+                                        </div>
+                                    )}
+                                    {msg.file_path && (
+                                        <div style={{marginBottom:msg.message?8:0}}>
+                                            {isImage(msg.file_type) ? (
+                                                <a href={`../${msg.file_path}`} target="_blank" rel="noopener noreferrer">
+                                                    <img src={`../${msg.file_path}`} alt={msg.file_name} 
+                                                        style={{maxWidth:'100%',maxHeight:200,borderRadius:8,display:'block',marginBottom:4}} />
+                                                </a>
+                                            ) : (
+                                                <a href={`../${msg.file_path}`} download={msg.file_name}
+                                                    style={{
+                                                        display:'flex',
+                                                        alignItems:'center',
+                                                        gap:8,
+                                                        padding:'8px 12px',
+                                                        background:msg.sender_id === userId ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                                                        borderRadius:8,
+                                                        textDecoration:'none',
+                                                        color:'inherit'
+                                                    }}>
+                                                    <i className="bi bi-file-earmark" style={{fontSize:20}}></i>
+                                                    <div style={{flex:1,minWidth:0}}>
+                                                        <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                            {msg.file_name}
+                                                        </div>
+                                                        <div style={{fontSize:11,opacity:0.7}}>
+                                                            {formatFileSize(msg.file_size)}
+                                                        </div>
+                                                    </div>
+                                                    <i className="bi bi-download" style={{fontSize:16}}></i>
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+                                    {msg.message && <div style={{fontSize:14,lineHeight:1.4}}>{msg.message}</div>}
+                                    <div style={{fontSize:10,marginTop:4,opacity:0.6}}>
+                                        {new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'})}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+                    <form onSubmit={sendMessage} style={{padding:16,borderTop:'1px solid var(--border)'}}>
+                        {selectedFile && (
+                            <div style={{marginBottom:12,padding:12,background:'var(--gray-100)',borderRadius:'var(--radius)',display:'flex',alignItems:'center',gap:12}}>
+                                {isImage(selectedFile.type) ? (
+                                    <img src={URL.createObjectURL(selectedFile)} alt="preview" style={{width:48,height:48,objectFit:'cover',borderRadius:6}} />
+                                ) : (
+                                    <div style={{width:48,height:48,background:'var(--surface)',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                        <i className="bi bi-file-earmark" style={{fontSize:24,color:'var(--text-muted)'}}></i>
+                                    </div>
+                                )}
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                        {selectedFile.name}
+                                    </div>
+                                    <div style={{fontSize:11,color:'var(--text-muted)'}}>
+                                        {formatFileSize(selectedFile.size)}
+                                    </div>
+                                </div>
+                                <button type="button" onClick={removeFile} className="button button-small button-outline" style={{width:32,height:32,padding:0}}>
+                                    <i className="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        )}
+                        <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} 
+                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                                style={{display:'none'}} />
+                            <button type="button" onClick={()=>fileInputRef.current?.click()} 
+                                className="button button-outline" disabled={loading}
+                                style={{width:44,height:44,padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <i className="bi bi-paperclip" style={{fontSize:20}}></i>
+                            </button>
+                            <input type="text" value={newMessage} onChange={e=>setNewMessage(e.target.value)}
+                                placeholder="Введите сообщение..." disabled={loading}
+                                style={{flex:1,height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                            <button type="submit" className="button button-fill" disabled={loading || (!newMessage.trim() && !selectedFile)} style={{minWidth:100}}>
+                                {loading ? <span className="preloader preloader-white" style={{width:16,height:16}}></span> : <><i className="bi bi-send"></i> Отправить</>}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// === Active Order Tracking ===
+function ActiveOrderTracking({ order, userRole, onComplete }) {
+    const [map, setMap] = useState(null);
+    const [route, setRoute] = useState(null);
+    const [driverPos, setDriverPos] = useState(null);
+    const [startTime] = useState(Date.now());
+    const [elapsed, setElapsed] = useState(0);
+    const [distance, setDistance] = useState(0);
+    const mapRef = useRef(null);
+    const watchId = useRef(null);
+    
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [startTime]);
+    
+    useEffect(() => {
+        if (!window.ymaps || !mapRef.current) return;
+        
+        window.ymaps.ready(() => {
+            const ymap = new window.ymaps.Map(mapRef.current, {
+                center: [order.pickup_lat, order.pickup_lng],
+                zoom: 12,
+                controls: ['zoomControl', 'fullscreenControl', 'geolocationControl']
+            });
+            
+            // Метка точки отправления (зеленая)
+            const pickupPlacemark = new window.ymaps.Placemark(
+                [order.pickup_lat, order.pickup_lng],
+                { 
+                    balloonContent: `<div style="padding:8px;"><b style="color:#22c55e;">📍 Откуда забрать</b><br/>${order.pickup_address}</div>`,
+                    iconCaption: 'Откуда'
+                },
+                { 
+                    preset: 'islands#greenDotIconWithCaption',
+                    iconCaptionMaxWidth: '150'
+                }
+            );
+            
+            // Метка точки назначения (красная)
+            const deliveryPlacemark = new window.ymaps.Placemark(
+                [order.delivery_lat, order.delivery_lng],
+                { 
+                    balloonContent: `<div style="padding:8px;"><b style="color:#ef4444;">🎯 Куда доставить</b><br/>${order.delivery_address}</div>`,
+                    iconCaption: 'Куда'
+                },
+                { 
+                    preset: 'islands#redDotIconWithCaption',
+                    iconCaptionMaxWidth: '150'
+                }
+            );
+            
+            ymap.geoObjects.add(pickupPlacemark);
+            ymap.geoObjects.add(deliveryPlacemark);
+            
+            // Построение маршрута
+            window.ymaps.route([
+                [order.pickup_lat, order.pickup_lng],
+                [order.delivery_lat, order.delivery_lng]
+            ], {
+                mapStateAutoApply: true,
+                routingMode: 'auto'
+            }).then(r => {
+                // Стиль линии маршрута
+                r.getPaths().options.set({ 
+                    strokeColor: '#0066ff', 
+                    strokeWidth: 5, 
+                    opacity: 0.8 
+                });
+                ymap.geoObjects.add(r);
+                setRoute(r);
+                setDistance((r.getLength() / 1000).toFixed(1));
+                
+                // Автоматически подстраиваем карту под маршрут
+                ymap.setBounds(r.getBounds(), {
+                    checkZoomRange: true,
+                    zoomMargin: 50
+                });
+            });
+            
+            setMap(ymap);
+        });
+        
+        return () => {
+            if (map) map.destroy();
+        };
+    }, []);
+    
+    useEffect(() => {
+        if (userRole !== 'driver' || !map) return;
+        
+        let driverMarker = null;
+        
+        if (navigator.geolocation) {
+            watchId.current = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const newPos = [pos.coords.latitude, pos.coords.longitude];
+                    setDriverPos(newPos);
+                    
+                    if (!driverMarker) {
+                        // Создаем метку водителя с иконкой автомобиля
+                        driverMarker = new window.ymaps.Placemark(
+                            newPos,
+                            { 
+                                balloonContent: '<div style="padding:8px;"><b>🚗 Ваше местоположение</b><br/>Водитель в пути</div>',
+                                iconCaption: 'Вы'
+                            },
+                            { 
+                                preset: 'islands#blueAutoCircleIcon',
+                                iconCaptionMaxWidth: '100'
+                            }
+                        );
+                        map.geoObjects.add(driverMarker);
+                    } else {
+                        // Обновляем позицию существующей метки
+                        driverMarker.geometry.setCoordinates(newPos);
+                    }
+                    
+                    // Плавно центрируем карту на водителе
+                    map.setCenter(newPos, 15, { duration: 500 });
+                },
+                (err) => {
+                    console.error('GPS error:', err);
+                    showToast('Не удалось получить GPS координаты', 'error');
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        } else {
+            showToast('Геолокация не поддерживается вашим браузером', 'error');
+        }
+        
+        return () => {
+            if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
+            if (driverMarker && map) map.geoObjects.remove(driverMarker);
+        };
+    }, [map, userRole]);
+    
+    const formatTime = (sec) => {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        return `${h > 0 ? h + 'ч ' : ''}${m}м ${s}с`;
+    };
+    
+    return (
+        <div>
+            <div className="card" style={{marginBottom:16}}>
+                <div className="card-header">
+                    <i className="bi bi-geo-alt-fill"></i>Активный заказ #{order.id}
+                </div>
+                <div style={{height:400,position:'relative'}}>
+                    <div ref={mapRef} style={{width:'100%',height:'100%'}}></div>
+                </div>
+            </div>
+            
+            <div className="stat-grid" style={{marginBottom:16}}>
+                <div className="stat-item">
+                    <i className="bi bi-clock stat-icon"></i>
+                    <div className="stat-val">{formatTime(elapsed)}</div>
+                    <div className="stat-lbl">В пути</div>
+                </div>
+                <div className="stat-item">
+                    <i className="bi bi-signpost stat-icon"></i>
+                    <div className="stat-val">{distance} км</div>
+                    <div className="stat-lbl">Расстояние</div>
+                </div>
+                <div className="stat-item">
+                    <i className="bi bi-wallet2 stat-icon"></i>
+                    <div className="stat-val">{order.price} ₽</div>
+                    <div className="stat-lbl">Стоимость</div>
+                </div>
+            </div>
+            
+            <div className="card" style={{marginBottom:16}}>
+                <div className="card-header">Детали маршрута</div>
+                <div className="card-content-padding">
+                    <div style={{marginBottom:16}}>
+                        <div style={{fontSize:13,fontWeight:600,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
+                            <i className="bi bi-circle-fill" style={{color:'#22c55e',fontSize:10}}></i>
+                            Откуда забрать
+                        </div>
+                        <div style={{fontSize:14,color:'var(--text-muted)',paddingLeft:16}}>{order.pickup_address}</div>
+                    </div>
+                    <div>
+                        <div style={{fontSize:13,fontWeight:600,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
+                            <i className="bi bi-circle-fill" style={{color:'#ef4444',fontSize:10}}></i>
+                            Куда доставить
+                        </div>
+                        <div style={{fontSize:14,color:'var(--text-muted)',paddingLeft:16}}>{order.delivery_address}</div>
+                    </div>
+                </div>
+            </div>
+            
+            {userRole === 'driver' && (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <button className="button button-outline button-large" onClick={() => {
+                        // Открываем Яндекс.Карты с построенным маршрутом
+                        // rtext - точки маршрута (откуда~куда)
+                        // rtt=auto - тип маршрута (автомобиль)
+                        // z=12 - зум карты
+                        const url = `https://yandex.ru/maps/?rtext=${order.pickup_lat},${order.pickup_lng}~${order.delivery_lat},${order.delivery_lng}&rtt=auto&z=12`;
+                        window.open(url, '_blank');
+                    }}>
+                        <i className="bi bi-navigation" style={{marginRight:8}}></i>
+                        Открыть в Яндекс.Картах
+                    </button>
+                    <button className="button button-fill button-large" onClick={onComplete}>
+                        <i className="bi bi-check-circle" style={{marginRight:8}}></i>
+                        Завершить
+                    </button>
+                </div>
+            )}
+            
+            <div className="card" style={{marginTop:16}}>
+                <div className="card-header">Информация о грузе</div>
+                <div className="card-content-padding">
+                    <div style={{marginBottom:12}}>
+                        <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Описание</div>
+                        <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_description || 'Не указано'}</div>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                        <div>
+                            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Вес</div>
+                            <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_weight ? order.cargo_weight + ' кг' : 'Не указано'}</div>
+                        </div>
+                        <div>
+                            <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Габариты</div>
+                            <div style={{fontSize:14,color:'var(--text-muted)'}}>{order.cargo_dimensions || 'Не указано'}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -153,28 +676,171 @@ function PageHeader({ title, subtitle, actions }) {
 
 // === Landing ===
 function LandingPage() {
+    const [activeGalleryImg, setActiveGalleryImg] = useState(0);
+    
+    const features = [
+        {icon:'bi-lightning-charge-fill', title:'Быстро', desc:'Мгновенное оформление заказа за пару минут'},
+        {icon:'bi-shield-check', title:'Надёжно', desc:'Проверенные водители с рейтингом'},
+        {icon:'bi-cash-coin', title:'Выгодно', desc:'Честные цены без скрытых комиссий'},
+        {icon:'bi-geo-alt-fill', title:'Отслеживание', desc:'GPS-трекинг в реальном времени'},
+        {icon:'bi-chat-dots', title:'Поддержка', desc:'Чат с водителем и поддержкой 24/7'},
+        {icon:'bi-star-fill', title:'Качество', desc:'Система отзывов и рейтингов'}
+    ];
+    
+    const stats = [
+        {value:'1000+', label:'Доставок'},
+        {value:'500+', label:'Водителей'},
+        {value:'4.9', label:'Рейтинг'},
+        {value:'24/7', label:'Поддержка'}
+    ];
+    
+    const galleryImages = [
+        {id:1, title:'Быстрая доставка', desc:'Доставим ваш груз в любую точку страны'},
+        {id:2, title:'Надёжные водители', desc:'Опытные профессионалы с высоким рейтингом'},
+        {id:3, title:'Отслеживание', desc:'Следите за доставкой в реальном времени'}
+    ];
+    
     return (
-        <div className="landing-hero">
-            <div className="landing-logo"><i className="bi bi-truck"></i></div>
-            <h1 className="landing-title">DeliveryCarGo</h1>
-            <p className="landing-sub">Быстрая и надёжная доставка грузов по всей стране — оформляйте заказы за пару минут.</p>
-            <div className="landing-actions">
-                <a href="login.html" className="button button-fill button-large">Войти</a>
-                <a href="register.html" className="button button-outline button-large">Создать аккаунт</a>
-            </div>
-            <div className="landing-features">
-                {[
-                    {i:'bi-lightning-charge-fill',t:'Быстро',d:'Мгновенное оформление'},
-                    {i:'bi-shield-check',t:'Надёжно',d:'Проверенные водители'},
-                    {i:'bi-cash-coin',t:'Выгодно',d:'Честные цены'}
-                ].map(f=>(
-                    <div key={f.t} className="landing-feat">
-                        <i className={'bi '+f.i}></i>
-                        <div className="landing-feat-t">{f.t}</div>
-                        <div className="landing-feat-d">{f.d}</div>
+        <div className="landing-page">
+            {/* Hero Section */}
+            <section className="landing-hero-new">
+                <div className="landing-container">
+                    <div className="landing-hero-content">
+                        <h1 className="landing-hero-title">DeliveryCarGo</h1>
+                        <p className="landing-hero-subtitle">
+                            Быстрая и надёжная доставка грузов по всей стране. 
+                            Оформляйте заказы за пару минут, отслеживайте в реальном времени.
+                        </p>
+                        <div className="landing-hero-actions">
+                            <a href="register.html" className="button button-fill button-large landing-btn-primary">
+                                <i className="bi bi-box-seam"></i>
+                                Создать аккаунт
+                            </a>
+                            <a href="login.html" className="button button-outline button-large landing-btn-secondary">
+                                <i className="bi bi-arrow-right-circle"></i>
+                                Войти
+                            </a>
+                        </div>
                     </div>
-                ))}
-            </div>
+                </div>
+            </section>
+            
+            {/* Stats Section */}
+            <section className="landing-stats">
+                <div className="landing-container">
+                    <div className="stats-grid">
+                        {stats.map((stat, i) => (
+                            <div key={i} className="stat-card">
+                                <div className="stat-value">{stat.value}</div>
+                                <div className="stat-label">{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            
+            {/* Features Section */}
+            <section className="landing-features-new">
+                <div className="landing-container">
+                    <div className="section-header">
+                        <h2 className="section-title">Почему выбирают нас</h2>
+                        <p className="section-subtitle">Всё что нужно для комфортной доставки грузов</p>
+                    </div>
+                    <div className="features-grid">
+                        {features.map((f, i) => (
+                            <div key={i} className="feature-card">
+                                <div className="feature-icon">
+                                    <i className={'bi ' + f.icon}></i>
+                                </div>
+                                <h3 className="feature-title">{f.title}</h3>
+                                <p className="feature-desc">{f.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            
+            {/* Gallery Section */}
+            <section className="landing-gallery">
+                <div className="landing-container">
+                    <div className="section-header">
+                        <h2 className="section-title">Как это работает</h2>
+                        <p className="section-subtitle">Простой процесс от заказа до доставки</p>
+                    </div>
+                    <div className="gallery-container">
+                        <div className="gallery-main">
+                            <div className="gallery-image-placeholder">
+                                <i className="bi bi-image" style={{fontSize:64,color:'var(--text-muted)'}}></i>
+                                <p style={{marginTop:16,color:'var(--text-muted)'}}>
+                                    Изображение {activeGalleryImg + 1}: {galleryImages[activeGalleryImg].title}
+                                </p>
+                                <p style={{fontSize:14,color:'var(--text-light)'}}>
+                                    {galleryImages[activeGalleryImg].desc}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="gallery-thumbs">
+                            {galleryImages.map((img, i) => (
+                                <div key={img.id} 
+                                    className={`gallery-thumb ${i === activeGalleryImg ? 'active' : ''}`}
+                                    onClick={() => setActiveGalleryImg(i)}>
+                                    <div className="gallery-thumb-placeholder">
+                                        <i className="bi bi-image"></i>
+                                    </div>
+                                    <span>{img.title}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            {/* CTA Section */}
+            <section className="landing-cta">
+                <div className="landing-container">
+                    <div className="cta-card">
+                        <h2 className="cta-title">Готовы начать?</h2>
+                        <p className="cta-subtitle">Создайте аккаунт и отправьте первый заказ уже сегодня</p>
+                        <div className="cta-actions">
+                            <a href="register.html" className="button button-fill button-large">
+                                Создать аккаунт бесплатно
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            {/* Footer */}
+            <footer className="landing-footer">
+                <div className="landing-container">
+                    <div className="footer-content">
+                        <div className="footer-brand">
+                            <div className="footer-logo">
+                                <i className="bi bi-truck"></i>
+                                <span>DeliveryCarGo</span>
+                            </div>
+                            <p>Надёжная доставка грузов по всей России</p>
+                        </div>
+                        <div className="footer-links">
+                            <div className="footer-col">
+                                <h4>Компания</h4>
+                                <a href="#">О нас</a>
+                                <a href="#">Контакты</a>
+                                <a href="#">Вакансии</a>
+                            </div>
+                            <div className="footer-col">
+                                <h4>Поддержка</h4>
+                                <a href="#">Помощь</a>
+                                <a href="#">FAQ</a>
+                                <a href="#">Условия</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="footer-bottom">
+                        <p>© 2026 DeliveryCarGo. Все права защищены.</p>
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }
@@ -254,34 +920,79 @@ function haversineKm(a, b) {
 // === Create Order Components ===
 const YANDEX_API_KEY = '485cdea2-4f3a-4f5a-b0ad-9251c4962490';
 const PRICE = {
-    base: 300,
-    perKm: 25,
+    base: 200,              // Базовая стоимость снижена
+    perKm: 15,              // За километр снижена
+    nightSurcharge: 1.5,    // Ночной тариф +50%
+    nightStart: 22,         // Начало ночного тарифа (22:00)
+    nightEnd: 6,            // Конец ночного тарифа (06:00)
     weightRates: [
-        { max: 10, mult: 1.0 },
-        { max: 50, mult: 1.3 },
-        { max: 200, mult: 1.6 },
-        { max: 500, mult: 2.0 },
-        { max: Infinity, mult: 2.5 }
+        { max: 10, mult: 1.0, label: 'До 10 кг' },
+        { max: 50, mult: 1.2, label: '10-50 кг' },
+        { max: 200, mult: 1.4, label: '50-200 кг' },
+        { max: 500, mult: 1.7, label: '200-500 кг' },
+        { max: Infinity, mult: 2.0, label: 'Более 500 кг' }
     ],
-    dimensionRate: 0.5,
+    dimensionRate: 0.3,
     options: {
-        fragile: { label: 'Хрупкий груз', icon: 'bi-exclamation-diamond', price: 500 },
-        express: { label: 'Экспресс доставка', icon: 'bi-lightning-charge', price: 800 },
-        insurance: { label: 'Страхование', icon: 'bi-shield-check', price: 400 },
-        loading: { label: 'Погрузка/Разгрузка', icon: 'bi-people', price: 600 },
+        fragile: { label: 'Хрупкий груз', icon: 'bi-exclamation-diamond', price: 300, desc: 'Особая осторожность при перевозке' },
+        express: { label: 'Экспресс доставка', icon: 'bi-lightning-charge', price: 500, desc: 'Приоритетная доставка' },
+        insurance: { label: 'Страхование груза', icon: 'bi-shield-check', price: 250, desc: 'Компенсация до 100 000 ₽' },
+        loading: { label: 'Погрузка/Разгрузка', icon: 'bi-people', price: 400, desc: 'Помощь грузчиков' },
     }
 };
 
-function calcPrice(distanceKm, weightKg, volumeM3, selectedOptions) {
-    let total = PRICE.base;
-    total += distanceKm * PRICE.perKm;
+function isNightTime(hour) {
+    return hour >= PRICE.nightStart || hour < PRICE.nightEnd;
+}
+
+function calcPrice(distanceKm, weightKg, volumeM3, selectedOptions, deliveryHour = null) {
+    let breakdown = {
+        base: PRICE.base,
+        distance: Math.round(distanceKm * PRICE.perKm),
+        weight: 0,
+        volume: 0,
+        options: 0,
+        nightSurcharge: 0,
+        subtotal: 0,
+        total: 0
+    };
+    
+    // Базовая + расстояние
+    let subtotal = breakdown.base + breakdown.distance;
+    
+    // Вес
     const wRate = PRICE.weightRates.find(r => weightKg <= r.max) || PRICE.weightRates[PRICE.weightRates.length - 1];
-    total *= wRate.mult;
-    if (volumeM3 > 1) total += (volumeM3 - 1) * PRICE.dimensionRate * 1000;
-    for (const opt of selectedOptions) {
-        if (PRICE.options[opt]) total += PRICE.options[opt].price;
+    breakdown.weightMultiplier = wRate.mult;
+    breakdown.weightCategory = wRate.label;
+    subtotal *= wRate.mult;
+    breakdown.weight = Math.round(subtotal - breakdown.base - breakdown.distance);
+    
+    // Объем
+    if (volumeM3 > 1) {
+        breakdown.volume = Math.round((volumeM3 - 1) * PRICE.dimensionRate * 1000);
+        subtotal += breakdown.volume;
     }
-    return Math.round(total);
+    
+    // Опции
+    for (const opt of selectedOptions) {
+        if (PRICE.options[opt]) {
+            breakdown.options += PRICE.options[opt].price;
+        }
+    }
+    subtotal += breakdown.options;
+    
+    breakdown.subtotal = Math.round(subtotal);
+    
+    // Ночной тариф
+    const currentHour = deliveryHour !== null ? deliveryHour : new Date().getHours();
+    if (isNightTime(currentHour)) {
+        breakdown.nightSurcharge = Math.round(breakdown.subtotal * (PRICE.nightSurcharge - 1));
+        breakdown.isNight = true;
+    }
+    
+    breakdown.total = breakdown.subtotal + breakdown.nightSurcharge;
+    
+    return breakdown;
 }
 
 function formatTime(minutes) {
@@ -528,6 +1239,21 @@ function OrderCard({ order, userRole, userId, onAction }) {
                         {canReview && canReview.can_review && (
                             <button className="button button-fill button-small" onClick={() => setShowReview(true)}>
                                 <i className="bi bi-star" style={{marginRight:4}}></i>Оставить отзыв
+                            </button>
+                        )}
+                        {(order.status === 'accepted' || order.status === 'in_progress') && order.driver_id && (
+                            <button className="button button-outline button-small" onClick={async () => {
+                                const r = await api.request('../api/chat.php', {
+                                    action: 'get_or_create_chat',
+                                    type: 'order',
+                                    order_id: order.id
+                                });
+                                if (r.success) {
+                                    window.location.hash = 'messages';
+                                    window.location.reload();
+                                }
+                            }}>
+                                <i className="bi bi-chat-dots" style={{marginRight:4}}></i>Написать
                             </button>
                         )}
                     </div>
@@ -1125,7 +1851,7 @@ function CreateOrder({ onComplete }) {
             cargo_description: cargoType + (selectedOptions.length ? ' | Опции: ' + selectedOptions.map(o => PRICE.options[o].label).join(', ') : ''),
             cargo_weight: cargoWeight,
             cargo_dimensions: dims,
-            price: price
+            price: price.total
         });
         setSubmitting(false);
         if (r.success) {
@@ -1278,22 +2004,62 @@ function CreateOrder({ onComplete }) {
                             </div>
                         </div>
                     </div>
-                    <div className="card">
-                        <div className="card-header"><i className="bi bi-cash-coin"></i>Расчёт стоимости</div>
-                        <div className="card-content card-content-padding">
-                            <div className="price-summary" style={{margin:0,background:'transparent',padding:0}}>
-                                <div className="price-summary-row"><span>Базовая стоимость</span><span>{PRICE.base} ₽</span></div>
-                                <div className="price-summary-row"><span>Расстояние ({distanceKm.toFixed(1)} км × {PRICE.perKm} ₽)</span><span>{Math.round(distanceKm * PRICE.perKm)} ₽</span></div>
-                                <div className="price-summary-row"><span>Коэффициент веса ({weightKg} кг)</span><span>×{(PRICE.weightRates.find(r => weightKg <= r.max) || PRICE.weightRates[PRICE.weightRates.length - 1]).mult}</span></div>
-                                {volumeM3 > 1 && <div className="price-summary-row"><span>Объём (+{(volumeM3 - 1).toFixed(2)} м³)</span><span>+{Math.round((volumeM3 - 1) * PRICE.dimensionRate * 1000)} ₽</span></div>}
-                                {selectedOptions.map(key => (
-                                    <div key={key} className="price-summary-row"><span>{PRICE.options[key].label}</span><span>+{PRICE.options[key].price} ₽</span></div>
-                                ))}
-                                <div className="price-summary-total">
-                                    <span>Итого</span>
-                                    <span>{price.toLocaleString('ru-RU')} ₽</span>
-                                </div>
+                    <div className="price-summary">
+                        <div className="price-summary-title">
+                            <i className="bi bi-calculator"></i> Расчёт стоимости
+                        </div>
+                        
+                        <div className="price-row">
+                            <span className="price-label">Базовая стоимость</span>
+                            <span className="price-value">{price.base.toLocaleString('ru-RU')} ₽</span>
+                        </div>
+                        
+                        <div className="price-row">
+                            <span className="price-label">Расстояние ({distanceKm.toFixed(1)} км × {PRICE.perKm} ₽/км)</span>
+                            <span className="price-value">{price.distance.toLocaleString('ru-RU')} ₽</span>
+                        </div>
+                        
+                        {price.weight > 0 && (
+                            <div className="price-row">
+                                <span className="price-label">Вес ({price.weightCategory}, ×{price.weightMultiplier})</span>
+                                <span className="price-value">{price.weight.toLocaleString('ru-RU')} ₽</span>
                             </div>
+                        )}
+                        
+                        {price.volume > 0 && (
+                            <div className="price-row">
+                                <span className="price-label">Объём (+{(volumeM3 - 1).toFixed(2)} м³)</span>
+                                <span className="price-value">{price.volume.toLocaleString('ru-RU')} ₽</span>
+                            </div>
+                        )}
+                        
+                        {price.options > 0 && selectedOptions.map(key => (
+                            <div key={key} className="price-row">
+                                <span className="price-label">{PRICE.options[key].label}</span>
+                                <span className="price-value">{PRICE.options[key].price.toLocaleString('ru-RU')} ₽</span>
+                            </div>
+                        ))}
+                        
+                        {price.isNight && (
+                            <div className="price-row" style={{background:'rgba(255,193,7,0.1)',margin:'8px -24px',padding:'10px 24px',borderRadius:8}}>
+                                <span className="price-label">
+                                    <i className="bi bi-moon-stars-fill" style={{marginRight:6,color:'#fbbf24'}}></i>
+                                    Ночной тариф (22:00-06:00, +50%)
+                                </span>
+                                <span className="price-value" style={{color:'#fbbf24'}}>+{price.nightSurcharge.toLocaleString('ru-RU')} ₽</span>
+                            </div>
+                        )}
+                        
+                        <div className="price-row">
+                            <span className="price-label" style={{fontSize:18,fontWeight:700}}>Итого к оплате</span>
+                            <span className="price-total">{price.total.toLocaleString('ru-RU')} ₽</span>
+                        </div>
+                        
+                        <div style={{marginTop:16,padding:12,background:'rgba(255,255,255,0.1)',borderRadius:8,fontSize:13,opacity:0.9}}>
+                            <i className="bi bi-info-circle" style={{marginRight:6}}></i>
+                            {price.isNight 
+                                ? 'Сейчас действует ночной тариф. Дневная доставка (06:00-22:00) будет дешевле на 50%.'
+                                : 'Ночная доставка (22:00-06:00) стоит на 50% дороже.'}
                         </div>
                     </div>
                     <div className="form-navigation">
@@ -1554,13 +2320,7 @@ function App() {
     if (!user) return (
         <div id="app">
             <div className="page">
-                <div className="navbar">
-                    <div className="navbar-bg"></div>
-                    <div className="navbar-inner">
-                        <div className="title"><i className="bi bi-truck" style={{marginRight:8}}></i>DeliveryCarGo</div>
-                    </div>
-                </div>
-                <div className="page-content" style={{paddingTop:56}}>
+                <div className="page-content">
                     <ToastContainer />
                     <LandingPage />
                 </div>
@@ -1570,10 +2330,14 @@ function App() {
 
     // Logged in
     const roleLabel = { client:'Клиент', driver:'Водитель', admin:'Администратор' };
+    const activeOrder = orders.find(o => o.status === 'in_progress' && user.role === 'driver' && o.driver_id === user.id);
+    
     const tabItems = [
         { id:'dashboard', icon:'bi-house', label:'Главная' },
         ...(user.role==='client' ? [{ id:'create', icon:'bi-plus-circle', label:'Новый заказ' }] : []),
+        ...(activeOrder ? [{ id:'active', icon:'bi-geo-alt-fill', label:'Активный заказ' }] : []),
         { id:'orders', icon:'bi-list-ul', label:'Заказы' },
+        { id:'messages', icon:'bi-chat-dots', label:'Сообщения' },
         { id:'profile', icon:'bi-person', label:'Профиль' },
         { id:'faq', icon:'bi-question-circle', label:'Помощь' },
         ...(user.role==='admin' ? [{ id:'admin', icon:'bi-shield-lock', label:'Админ' }] : []),
@@ -1608,30 +2372,18 @@ function App() {
 
                 {/* Main Content */}
                 <div className="main-content">
-                    {/* Top navbar for Mobile */}
-                    <div className="navbar navbar-main mobile-navbar">
-                        <div className="navbar-bg"></div>
-                        <div className="navbar-inner">
-                            <div className="navbar-brand">
-                                <i className="bi bi-truck"></i>
-                                <span>DeliveryCarGo</span>
-                            </div>
-                            <div className="navbar-actions" style={{display:'flex',gap:8,alignItems:'center'}}>
-                                <NotificationBell userId={user.id} />
-                                <button className="button button-logout" onClick={logout} title="Выйти">
-                                    <i className="bi bi-box-arrow-right"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Page content */}
                     <div className="page-content page-content-main">
                         <ToastContainer />
                         <div className="content-wrapper">
                             {activeTab === 'dashboard' && <Dashboard userRole={user.role} userName={user.full_name} orders={orders} onNavigate={setActiveTab} />}
                             {activeTab === 'create' && <React.Fragment><PageHeader title="Новый заказ" subtitle="Заполните данные и отправьте заказ за несколько шагов" /><CreateOrder onComplete={() => { setRefreshKey(k => k + 1); setActiveTab('orders'); }} /></React.Fragment>}
+                            {activeTab === 'active' && activeOrder && <React.Fragment><PageHeader title="Активный заказ" subtitle="Отслеживание доставки в реальном времени" /><ActiveOrderTracking order={activeOrder} userRole={user.role} onComplete={async () => {
+                                const r = await api.request('../api/orders.php', {action:'update_status', order_id:activeOrder.id, status:'delivered', comment:''});
+                                if(r.success){showToast('Заказ завершён!','success');setRefreshKey(k=>k+1);setActiveTab('orders');}else showToast(r.message,'error');
+                            }} /></React.Fragment>}
                             {activeTab === 'orders' && <OrderList userRole={user.role} userId={user.id} refreshKey={refreshKey} />}
+                            {activeTab === 'messages' && <React.Fragment><PageHeader title="Сообщения" subtitle="Общайтесь с клиентами, водителями и поддержкой" /><Messenger userRole={user.role} userId={user.id} /></React.Fragment>}
                             {activeTab === 'profile' && <React.Fragment><PageHeader title="Профиль" subtitle="Управляйте личными данными и настройками аккаунта" /><Profile onUpdate={checkAuth} orders={orders} /></React.Fragment>}
                             {activeTab === 'faq' && <React.Fragment><PageHeader title="Помощь" subtitle="Ответы на часто задаваемые вопросы" /><FAQ /></React.Fragment>}
                             {activeTab === 'admin' && <React.Fragment><PageHeader title="Администрирование" subtitle="Управление заказами и пользователями платформы" /><AdminPanel /></React.Fragment>}

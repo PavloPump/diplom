@@ -1,0 +1,14 @@
+# Разрешаем доступ к файлам
+Options -Indexes
+
+# Защита от выполнения PHP скриптов
+<FilesMatch "\.php$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Разрешаем только определенные типы файлов
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|pdf|doc|docx|xls|xlsx|txt|zip|rar)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
