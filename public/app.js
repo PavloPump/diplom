@@ -464,6 +464,9 @@ function PageHeader({ title, subtitle, actions }) {
 // === Landing ===
 function LandingPage() {
     const [activeGalleryImg, setActiveGalleryImg] = useState(0);
+    const [trackOrderId, setTrackOrderId] = useState('');
+    const [trackingOrder, setTrackingOrder] = useState(null);
+    const [trackingLoading, setTrackingLoading] = useState(false);
     
     const features = [
         {icon:'bi-lightning-charge-fill', title:'Быстро', desc:'Мгновенное оформление заказа за пару минут'},
@@ -487,6 +490,23 @@ function LandingPage() {
         {id:3, title:'Отслеживание', desc:'Следите за доставкой в реальном времени'}
     ];
     
+    const handleTrackOrder = async (e) => {
+        e.preventDefault();
+        if (!trackOrderId.trim()) {
+            showToast('Введите номер заказа', 'error');
+            return;
+        }
+        setTrackingLoading(true);
+        const r = await api.request('../api/track.php', { action: 'track_order', order_id: trackOrderId });
+        setTrackingLoading(false);
+        if (r.success) {
+            setTrackingOrder(r.order);
+        } else {
+            showToast(r.message, 'error');
+            setTrackingOrder(null);
+        }
+    };
+    
     return (
         <div className="landing-page">
             {/* Hero Section */}
@@ -509,6 +529,83 @@ function LandingPage() {
                             </a>
                         </div>
                     </div>
+                </div>
+            </section>
+            
+            {/* Track Order Section */}
+            <section className="landing-track" style={{background:'var(--gray-100)',padding:'60px 0'}}>
+                <div className="landing-container">
+                    <div className="section-header" style={{textAlign:'center',marginBottom:40}}>
+                        <h2 className="section-title">Отследить заказ</h2>
+                        <p className="section-subtitle">Введите номер заказа для отслеживания доставки</p>
+                    </div>
+                    <form onSubmit={handleTrackOrder} style={{maxWidth:600,margin:'0 auto'}}>
+                        <div style={{display:'flex',gap:12,marginBottom:24}}>
+                            <input 
+                                type="number" 
+                                value={trackOrderId}
+                                onChange={e=>setTrackOrderId(e.target.value)}
+                                placeholder="Введите номер заказа (например: 123)"
+                                style={{
+                                    flex:1,
+                                    padding:'16px 20px',
+                                    fontSize:18,
+                                    border:'2px solid var(--border)',
+                                    borderRadius:'var(--radius)',
+                                    fontFamily:'inherit'
+                                }}
+                            />
+                            <button type="submit" className="button button-fill button-large" disabled={trackingLoading}>
+                                {trackingLoading ? <span className="preloader preloader-white" style={{width:20,height:20}}></span> : <><i className="bi bi-search"></i> Найти</>}
+                            </button>
+                        </div>
+                    </form>
+                    
+                    {trackingOrder && (
+                        <div className="card" style={{maxWidth:800,margin:'0 auto',marginTop:24}}>
+                            <div className="card-header" style={{background:'var(--primary)',color:'var(--white)'}}>
+                                <i className="bi bi-box-seam"></i>
+                                Заказ #{trackingOrder.id}
+                            </div>
+                            <div className="card-content-padding">
+                                <div style={{marginBottom:20}}>
+                                    <StatusBadge status={trackingOrder.status} />
+                                </div>
+                                <div style={{marginBottom:20}}>
+                                    <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>
+                                        <i className="bi bi-circle-fill" style={{color:'#22c55e',fontSize:12,marginRight:8}}></i>
+                                        Откуда: {trackingOrder.pickup_address}
+                                    </div>
+                                    <div style={{fontSize:16,fontWeight:600}}>
+                                        <i className="bi bi-geo-alt-fill" style={{color:'#ef4444',fontSize:12,marginRight:8}}></i>
+                                        Куда: {trackingOrder.delivery_address}
+                                    </div>
+                                </div>
+                                {trackingOrder.driver_name && (
+                                    <div style={{background:'var(--gray-100)',padding:16,borderRadius:8,marginBottom:20}}>
+                                        <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>Водитель</div>
+                                        <div style={{fontSize:15,marginBottom:4}}>{trackingOrder.driver_name}</div>
+                                        {trackingOrder.car_model && <div style={{fontSize:14,color:'var(--text-muted)'}}>{trackingOrder.car_model} • {trackingOrder.car_number}</div>}
+                                    </div>
+                                )}
+                                {trackingOrder.history && trackingOrder.history.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:16,fontWeight:600,marginBottom:12}}>История заказа</div>
+                                        {trackingOrder.history.map((h, i) => (
+                                            <div key={i} style={{display:'flex',gap:12,marginBottom:12,paddingBottom:12,borderBottom:i < trackingOrder.history.length - 1 ? '1px solid var(--border)' : 'none'}}>
+                                                <div style={{width:8,height:8,borderRadius:'50%',background:'var(--primary)',marginTop:6,flexShrink:0}}></div>
+                                                <div style={{flex:1}}>
+                                                    <div style={{fontSize:15,fontWeight:600}}><StatusBadge status={h.status} /></div>
+                                                    {h.comment && <div style={{fontSize:14,color:'var(--text-muted)',marginTop:4}}>{h.comment}</div>}
+                                                    <div style={{fontSize:13,color:'var(--text-light)',marginTop:4}}>{new Date(h.created_at).toLocaleString('ru-RU')}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
             

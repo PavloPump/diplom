@@ -54,9 +54,9 @@ function createReview() {
         return;
     }
     
-    // Проверяем, что пользователь участвовал в заказе
-    if ($user_id != $order['client_id'] && $user_id != $order['driver_id']) {
-        echo json_encode(['success' => false, 'message' => 'Вы не участвовали в этом заказе']);
+    // Только клиент может оставлять отзыв на водителя
+    if ($user_id != $order['client_id']) {
+        echo json_encode(['success' => false, 'message' => 'Только клиент может оставить отзыв']);
         return;
     }
     
@@ -174,8 +174,9 @@ function canReview() {
         return;
     }
     
-    if ($user_id != $order['client_id'] && $user_id != $order['driver_id']) {
-        echo json_encode(['success' => true, 'can_review' => false, 'message' => 'Вы не участвовали в этом заказе']);
+    // Только клиент может оставлять отзыв на водителя
+    if ($user_id != $order['client_id']) {
+        echo json_encode(['success' => true, 'can_review' => false, 'message' => 'Только клиент может оставить отзыв']);
         return;
     }
     
@@ -189,8 +190,8 @@ function canReview() {
         return;
     }
     
-    // Определяем, кого оценивать
-    $to_user_id = ($user_id == $order['client_id']) ? $order['driver_id'] : $order['client_id'];
+    // Клиент оценивает водителя
+    $to_user_id = $order['driver_id'];
     
     echo json_encode(['success' => true, 'can_review' => true, 'to_user_id' => $to_user_id]);
 }
