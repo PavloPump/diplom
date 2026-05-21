@@ -572,33 +572,33 @@ function LandingPage() {
                         <p className="section-subtitle">Введите номер заказа для отслеживания доставки</p>
                     </div>
                     <form onSubmit={handleTrackOrder} style={{maxWidth:600,margin:'0 auto'}}>
-                        <div style={{display:'flex',gap:12,marginBottom:24}}>
+                        <div style={{display:'flex',gap:12,marginBottom:24,flexDirection:'row',flexWrap:'wrap'}}>
                             <input 
                                 type="number" 
                                 value={trackOrderId}
                                 onChange={e=>setTrackOrderId(e.target.value)}
-                                placeholder="Введите номер заказа (например: 123)"
+                                placeholder="Введите номер заказа"
                                 style={{
-                                    flex:1,
+                                    flex:'1 1 200px',
                                     padding:'16px 20px',
                                     fontSize:18,
                                     border:'2px solid var(--border)',
                                     borderRadius:'var(--radius)',
-                                    fontFamily:'inherit'
+                                    fontFamily:'inherit',
+                                    minWidth:200
                                 }}
                             />
-                            <button type="submit" className="button button-fill button-large" disabled={trackingLoading}>
+                            <button type="submit" className="button button-fill button-large" disabled={trackingLoading} style={{flex:'0 0 auto',minWidth:120}}>
                                 {trackingLoading ? <span className="preloader preloader-white" style={{width:20,height:20}}></span> : <><i className="bi bi-search"></i> Найти</>}
                             </button>
                         </div>
                     </form>
                     
                     {trackingError && (
-                        <div className="card" style={{maxWidth:600,margin:'0 auto',marginTop:24,border:'2px solid #ef4444'}}>
+                        <div className="card" style={{maxWidth:600,margin:'0 auto',marginTop:24,border:'1px solid #000000'}}>
                             <div className="card-content-padding" style={{textAlign:'center',padding:32}}>
-                                <i className="bi bi-x-circle" style={{fontSize:48,color:'#ef4444',marginBottom:16}}></i>
+                                <i className="bi bi-x-circle" style={{fontSize:48,color:'#f69696',marginBottom:16}}></i>
                                 <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Заказ не найден</div>
-                                <div style={{fontSize:15,color:'var(--text-muted)'}}>{trackingError}</div>
                             </div>
                         </div>
                     )}
