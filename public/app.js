@@ -3,6 +3,76 @@
 // === Toast ===
 let _toast = null;
 function showToast(msg, type = 'success') { if (_toast) _toast(msg, type); }
+
+// === Notifications System ===
+function NotificationBell({ userId }) {
+    const [count, setCount] = useState(0);
+    const [show, setShow] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    
+    const loadCount = async () => {
+        const r = await api.get('../api/notifications.php?action=count_unread');
+        if (r.success) setCount(r.count);
+    };
+    
+    const loadNotifications = async () => {
+        const r = await api.get('../api/notifications.php?action=list');
+        if (r.success) setNotifications(r.notifications);
+    };
+    
+    useEffect(() => {
+        loadCount();
+        const interval = setInterval(loadCount, 30000);
+        return () => clearInterval(interval);
+    }, [userId]);
+    
+    const handleOpen = () => {
+        setShow(true);
+        loadNotifications();
+    };
+    
+    const markAllRead = async () => {
+        await api.request('../api/notifications.php', { action: 'mark_all_read' });
+        loadCount();
+        loadNotifications();
+    };
+    
+    return (
+        <div style={{position:'relative'}}>
+            <button className="button button-outline button-small" onClick={handleOpen} style={{position:'relative',padding:'0 12px'}}>
+                <i className="bi bi-bell"></i>
+                {count > 0 && <span style={{position:'absolute',top:-4,right:-4,background:'#000',color:'#fff',borderRadius:'999px',fontSize:10,fontWeight:700,padding:'2px 6px',minWidth:18,textAlign:'center'}}>{count}</span>}
+            </button>
+            {show && (
+                <div style={{position:'fixed',inset:0,zIndex:99999}} onClick={()=>setShow(false)}>
+                    <div className="card" style={{position:'absolute',top:60,right:20,width:360,maxWidth:'calc(100vw - 40px)',margin:0,maxHeight:'70vh',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
+                        <div className="card-header" style={{justifyContent:'space-between'}}>
+                            <span>Уведомления</span>
+                            <div style={{display:'flex',gap:8}}>
+                                {count > 0 && <button className="button button-small" onClick={markAllRead} style={{height:32,padding:'0 12px',fontSize:12}}>Прочитать все</button>}
+                                <button className="button button-small button-outline" onClick={()=>setShow(false)} style={{height:32,width:32,padding:0}}><i className="bi bi-x-lg"></i></button>
+                            </div>
+                        </div>
+                        <div style={{flex:1,overflowY:'auto',padding:12}}>
+                            {notifications.length === 0 ? (
+                                <div className="empty-state" style={{padding:40}}>
+                                    <i className="bi bi-bell-slash"></i>
+                                    <div>Нет уведомлений</div>
+                                </div>
+                            ) : notifications.map(n => (
+                                <div key={n.id} style={{padding:12,borderRadius:8,background:n.is_read?'transparent':'var(--gray-100)',marginBottom:8,border:'1px solid var(--border)'}}>
+                                    <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{n.title}</div>
+                                    <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:6}}>{n.message}</div>
+                                    <div style={{fontSize:11,color:'var(--text-light)'}}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 function ToastContainer() {
     const [toasts, setToasts] = useState([]);
     const c = useRef(0);
@@ -459,7 +529,7 @@ function OrderList({ userRole, userId, refreshKey }) {
 }
 
 // === Profile ===
-function Profile({ onUpdate }) {
+function Profile({ onUpdate, orders }) {
     const [profile, setProfile] = useState(null);
     const [editing, setEditing] = useState(false);
     const [editingDriver, setEditingDriver] = useState(false);
@@ -475,6 +545,11 @@ function Profile({ onUpdate }) {
         }
     };
     useEffect(() => { loadProfile(); }, []);
+    
+    const userOrders = orders || [];
+    const totalOrders = userOrders.length;
+    const completedOrders = userOrders.filter(o => o.status === 'delivered').length;
+    const totalSpent = userOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + parseFloat(o.price || 0), 0);
     const handleUserUpdate = async (e) => {
         e.preventDefault(); setLoading(true);
         const r = await api.request('../api/user.php', { action: 'update_profile', ...form });
@@ -497,10 +572,32 @@ function Profile({ onUpdate }) {
                 <div className="card-content card-content-padding" style={{textAlign:'center'}}>
                     <div className="avatar">{profile.full_name.charAt(0).toUpperCase()}</div>
                     <div style={{fontWeight:700,fontSize:18}}>{profile.full_name}</div>
-                    <div style={{color:'#71717a',fontSize:13,marginBottom:6}}>{profile.email}</div>
+                    <div style={{color:'var(--text-muted)',fontSize:13,marginBottom:6}}>{profile.email}</div>
                     <span className="badge color-gray">{roleLabel[profile.role]||profile.role}</span>
                 </div>
             </div>
+            
+            {totalOrders > 0 && (
+                <div className="card">
+                    <div className="card-header"><i className="bi bi-bar-chart"></i>Моя статистика</div>
+                    <div className="card-content-padding">
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
+                            <div style={{textAlign:'center'}}>
+                                <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{totalOrders}</div>
+                                <div style={{fontSize:12,color:'var(--text-muted)'}}>Всего заказов</div>
+                            </div>
+                            <div style={{textAlign:'center'}}>
+                                <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{completedOrders}</div>
+                                <div style={{fontSize:12,color:'var(--text-muted)'}}>Выполнено</div>
+                            </div>
+                            <div style={{textAlign:'center'}}>
+                                <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{totalSpent.toLocaleString('ru-RU')} ₽</div>
+                                <div style={{fontSize:12,color:'var(--text-muted)'}}>{profile.role === 'driver' ? 'Заработано' : 'Потрачено'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="card">
                 <div className="card-header">Личные данные</div>
                 <div className="card-content card-content-padding">
@@ -569,7 +666,7 @@ function Profile({ onUpdate }) {
 
 // === AdminPanel ===
 function AdminPanel() {
-    const [tab, setTab] = useState('orders');
+    const [tab, setTab] = useState('dashboard');
     const [users, setUsers] = useState([]);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -578,7 +675,7 @@ function AdminPanel() {
     const loadOrders = async () => { setLoading(true); const r = await api.request('../api/orders.php',{action:'list'}); if(r.success)setOrders(r.orders); setLoading(false); };
     const loadUsers = async () => { setLoading(true); const r = await api.get('../api/admin.php?action=list_users'); if(r.success)setUsers(r.users); setLoading(false); };
     const loadStats = async () => { const r = await api.get('../api/admin.php?action=stats'); if(r.success)setStats(r.stats); };
-    useEffect(() => { loadStats(); if(tab==='orders')loadOrders(); else loadUsers(); }, [tab]);
+    useEffect(() => { loadStats(); if(tab==='orders')loadOrders(); else if(tab==='users')loadUsers(); }, [tab]);
     const askConfirm = (title,msg,danger,fn) => setConfirm({title,msg,danger,fn});
     const cancelOrder = (id) => askConfirm('Отмена','Отменить заказ #'+id+'?',true,async()=>{
         const r = await api.request('../api/orders.php',{action:'cancel',order_id:id});
@@ -597,26 +694,77 @@ function AdminPanel() {
         <div>
             <ConfirmDialog show={!!confirm} title={confirm?.title} message={confirm?.msg} danger={confirm?.danger}
                 onConfirm={()=>{const fn=confirm.fn;setConfirm(null);fn();}} onCancel={()=>setConfirm(null)} />
-            {stats && (
-                <div className="stat-grid" style={{marginBottom:12}}>
-                    {[
-                        {i:'bi-people',v:stats.clients,l:'Клиентов'},
-                        {i:'bi-truck',v:stats.drivers,l:'Водителей'},
-                        {i:'bi-receipt',v:stats.orders_total,l:'Заказов'},
-                        {i:'bi-wallet2',v:Number(stats.revenue).toLocaleString('ru-RU')+' ₽',l:'Выручка'}
-                    ].map(c=>(
-                        <div key={c.l} className="stat-item">
-                            <i className={'bi '+c.i+' stat-icon'}></i>
-                            <div className="stat-val">{c.v}</div>
-                            <div className="stat-lbl">{c.l}</div>
-                        </div>
-                    ))}
-                </div>
-            )}
-            <div className="segmented segmented-strong" style={{marginBottom:12}}>
+            
+            <div className="segmented segmented-strong" style={{marginBottom:24}}>
+                <button className={'button'+(tab==='dashboard'?' button-active':'')} onClick={()=>setTab('dashboard')}>Дашборд</button>
                 <button className={'button'+(tab==='orders'?' button-active':'')} onClick={()=>setTab('orders')}>Заказы</button>
                 <button className={'button'+(tab==='users'?' button-active':'')} onClick={()=>setTab('users')}>Пользователи</button>
             </div>
+            
+            {tab === 'dashboard' && stats && (
+                <div>
+                    <div className="stat-grid">
+                        {[
+                            {i:'bi-people',v:stats.clients,l:'Клиентов',c:'#000'},
+                            {i:'bi-truck',v:stats.drivers,l:'Водителей',c:'#000'},
+                            {i:'bi-receipt',v:stats.orders_total,l:'Всего заказов',c:'#000'},
+                            {i:'bi-clock',v:stats.orders_pending,l:'Ожидают',c:'#000'},
+                            {i:'bi-arrow-right-circle',v:stats.orders_in_progress,l:'В пути',c:'#000'},
+                            {i:'bi-check-circle',v:stats.orders_delivered,l:'Доставлено',c:'#000'},
+                            {i:'bi-x-circle',v:stats.orders_cancelled,l:'Отменено',c:'#000'},
+                            {i:'bi-wallet2',v:Number(stats.revenue).toLocaleString('ru-RU')+' ₽',l:'Выручка',c:'#000'}
+                        ].map(c=>(
+                            <div key={c.l} className="stat-item">
+                                <i className={'bi '+c.i+' stat-icon'} style={{color:c.c}}></i>
+                                <div className="stat-val">{c.v}</div>
+                                <div className="stat-lbl">{c.l}</div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="card">
+                        <div className="card-header"><i className="bi bi-graph-up"></i>Статистика заказов за 7 дней</div>
+                        <div className="card-content-padding">
+                            {stats.orders_by_day && stats.orders_by_day.length > 0 ? (
+                                <div style={{display:'flex',alignItems:'flex-end',gap:8,height:200,padding:'20px 0'}}>
+                                    {stats.orders_by_day.map((d,i)=>{
+                                        const max = Math.max(...stats.orders_by_day.map(x=>x.count));
+                                        const h = max > 0 ? (d.count / max) * 160 : 20;
+                                        return (
+                                            <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                                                <div style={{fontSize:11,fontWeight:600}}>{d.count}</div>
+                                                <div style={{width:'100%',height:h,background:'#000',borderRadius:4,transition:'all 0.3s'}}></div>
+                                                <div style={{fontSize:10,color:'var(--text-muted)',textAlign:'center'}}>{new Date(d.date).toLocaleDateString('ru-RU',{day:'2-digit',month:'short'})}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>Нет данных</div>}
+                        </div>
+                    </div>
+                    
+                    {stats.top_drivers && stats.top_drivers.length > 0 && (
+                        <div className="card">
+                            <div className="card-header"><i className="bi bi-trophy"></i>Топ водителей</div>
+                            <div className="card-content-padding">
+                                {stats.top_drivers.map((d,i)=>(
+                                    <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:i<stats.top_drivers.length-1?'1px solid var(--border)':'none'}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                            <div style={{width:32,height:32,borderRadius:'50%',background:'var(--gray-100)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14}}>#{i+1}</div>
+                                            <div>
+                                                <div style={{fontWeight:600,fontSize:14}}>{d.full_name}</div>
+                                                <div style={{fontSize:12,color:'var(--text-muted)'}}>{d.order_count} заказов</div>
+                                            </div>
+                                        </div>
+                                        <div style={{fontWeight:700,fontSize:15}}>{Number(d.total_revenue).toLocaleString('ru-RU')} ₽</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+            
             {loading && <div style={{textAlign:'center',padding:30}}><div className="preloader"></div></div>}
             {!loading && tab === 'orders' && (
                 <div>
@@ -1159,7 +1307,8 @@ function App() {
                                 <i className="bi bi-truck"></i>
                                 <span>DeliveryCarGo</span>
                             </div>
-                            <div className="navbar-actions">
+                            <div className="navbar-actions" style={{display:'flex',gap:8,alignItems:'center'}}>
+                                <NotificationBell userId={user.id} />
                                 <button className="button button-logout" onClick={logout} title="Выйти">
                                     <i className="bi bi-box-arrow-right"></i>
                                 </button>
@@ -1174,7 +1323,7 @@ function App() {
                             {activeTab === 'dashboard' && <Dashboard userRole={user.role} userName={user.full_name} orders={orders} onNavigate={setActiveTab} />}
                             {activeTab === 'create' && <React.Fragment><PageHeader title="Новый заказ" subtitle="Заполните данные и отправьте заказ за несколько шагов" /><CreateOrder onComplete={() => { setRefreshKey(k => k + 1); setActiveTab('orders'); }} /></React.Fragment>}
                             {activeTab === 'orders' && <OrderList userRole={user.role} userId={user.id} refreshKey={refreshKey} />}
-                            {activeTab === 'profile' && <React.Fragment><PageHeader title="Профиль" subtitle="Управляйте личными данными и настройками аккаунта" /><Profile onUpdate={checkAuth} /></React.Fragment>}
+                            {activeTab === 'profile' && <React.Fragment><PageHeader title="Профиль" subtitle="Управляйте личными данными и настройками аккаунта" /><Profile onUpdate={checkAuth} orders={orders} /></React.Fragment>}
                             {activeTab === 'admin' && <React.Fragment><PageHeader title="Администрирование" subtitle="Управление заказами и пользователями платформы" /><AdminPanel /></React.Fragment>}
                         </div>
                     </div>

@@ -121,11 +121,38 @@ function getStats() {
     $r = $conn->query("SELECT COUNT(*) AS cnt FROM orders WHERE status='pending'");
     $stats['orders_pending'] = (int)$r->fetch_assoc()['cnt'];
 
+    $r = $conn->query("SELECT COUNT(*) AS cnt FROM orders WHERE status='in_progress'");
+    $stats['orders_in_progress'] = (int)$r->fetch_assoc()['cnt'];
+
     $r = $conn->query("SELECT COUNT(*) AS cnt FROM orders WHERE status='delivered'");
     $stats['orders_delivered'] = (int)$r->fetch_assoc()['cnt'];
 
+    $r = $conn->query("SELECT COUNT(*) AS cnt FROM orders WHERE status='cancelled'");
+    $stats['orders_cancelled'] = (int)$r->fetch_assoc()['cnt'];
+
     $r = $conn->query("SELECT COALESCE(SUM(price),0) AS total FROM orders WHERE status='delivered'");
     $stats['revenue'] = (float)$r->fetch_assoc()['total'];
+
+    $r = $conn->query("SELECT COALESCE(AVG(price),0) AS avg FROM orders WHERE status='delivered'");
+    $stats['avg_order_value'] = (float)$r->fetch_assoc()['avg'];
+
+    $r = $conn->query("SELECT DATE(created_at) as date, COUNT(*) as count FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date");
+    $stats['orders_by_day'] = [];
+    while ($row = $r->fetch_assoc()) {
+        $stats['orders_by_day'][] = $row;
+    }
+
+    $r = $conn->query("SELECT status, COUNT(*) as count FROM orders GROUP BY status");
+    $stats['orders_by_status'] = [];
+    while ($row = $r->fetch_assoc()) {
+        $stats['orders_by_status'][] = $row;
+    }
+
+    $r = $conn->query("SELECT u.full_name, COUNT(o.id) as order_count, COALESCE(SUM(o.price),0) as total_revenue FROM users u INNER JOIN orders o ON o.driver_id = u.id WHERE o.status='delivered' GROUP BY u.id ORDER BY total_revenue DESC LIMIT 5");
+    $stats['top_drivers'] = [];
+    while ($row = $r->fetch_assoc()) {
+        $stats['top_drivers'][] = $row;
+    }
 
     echo json_encode(['success' => true, 'stats' => $stats]);
 }
