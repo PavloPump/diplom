@@ -463,9 +463,9 @@ function PageHeader({ title, subtitle, actions }) {
 
 // === Landing ===
 function LandingPage() {
-    const [activeGalleryImg, setActiveGalleryImg] = useState(0);
     const [trackOrderId, setTrackOrderId] = useState('');
     const [trackingOrder, setTrackingOrder] = useState(null);
+    const [trackingError, setTrackingError] = useState(null);
     const [trackingLoading, setTrackingLoading] = useState(false);
     
     const features = [
@@ -484,12 +484,6 @@ function LandingPage() {
         {value:'24/7', label:'Поддержка'}
     ];
     
-    const galleryImages = [
-        {id:1, title:'Быстрая доставка', desc:'Доставим ваш груз в любую точку страны'},
-        {id:2, title:'Надёжные водители', desc:'Опытные профессионалы с высоким рейтингом'},
-        {id:3, title:'Отслеживание', desc:'Следите за доставкой в реальном времени'}
-    ];
-    
     const handleTrackOrder = async (e) => {
         e.preventDefault();
         if (!trackOrderId.trim()) {
@@ -497,13 +491,16 @@ function LandingPage() {
             return;
         }
         setTrackingLoading(true);
+        setTrackingError(null);
+        setTrackingOrder(null);
         const r = await api.request('../api/track.php', { action: 'track_order', order_id: trackOrderId });
         setTrackingLoading(false);
         if (r.success) {
             setTrackingOrder(r.order);
+            setTrackingError(null);
         } else {
+            setTrackingError(r.message || 'Заказ не найден');
             showToast(r.message, 'error');
-            setTrackingOrder(null);
         }
     };
     
@@ -528,6 +525,41 @@ function LandingPage() {
                                 Войти
                             </a>
                         </div>
+                    </div>
+                </div>
+            </section>
+            
+            {/* Stats Section */}
+            <section className="landing-stats">
+                <div className="landing-container">
+                    <div className="stats-grid">
+                        {stats.map((stat, i) => (
+                            <div key={i} className="stat-card">
+                                <div className="stat-value">{stat.value}</div>
+                                <div className="stat-label">{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            
+            {/* Features Section */}
+            <section className="landing-features-new">
+                <div className="landing-container">
+                    <div className="section-header">
+                        <h2 className="section-title">Почему выбирают нас</h2>
+                        <p className="section-subtitle">Всё что нужно для комфортной доставки грузов</p>
+                    </div>
+                    <div className="features-grid">
+                        {features.map((f, i) => (
+                            <div key={i} className="feature-card">
+                                <div className="feature-icon">
+                                    <i className={'bi ' + f.icon}></i>
+                                </div>
+                                <h3 className="feature-title">{f.title}</h3>
+                                <p className="feature-desc">{f.desc}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </section>
@@ -560,6 +592,16 @@ function LandingPage() {
                             </button>
                         </div>
                     </form>
+                    
+                    {trackingError && (
+                        <div className="card" style={{maxWidth:600,margin:'0 auto',marginTop:24,border:'2px solid #ef4444'}}>
+                            <div className="card-content-padding" style={{textAlign:'center',padding:32}}>
+                                <i className="bi bi-x-circle" style={{fontSize:48,color:'#ef4444',marginBottom:16}}></i>
+                                <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Заказ не найден</div>
+                                <div style={{fontSize:15,color:'var(--text-muted)'}}>{trackingError}</div>
+                            </div>
+                        </div>
+                    )}
                     
                     {trackingOrder && (
                         <div className="card" style={{maxWidth:800,margin:'0 auto',marginTop:24}}>
@@ -606,76 +648,6 @@ function LandingPage() {
                             </div>
                         </div>
                     )}
-                </div>
-            </section>
-            
-            {/* Stats Section */}
-            <section className="landing-stats">
-                <div className="landing-container">
-                    <div className="stats-grid">
-                        {stats.map((stat, i) => (
-                            <div key={i} className="stat-card">
-                                <div className="stat-value">{stat.value}</div>
-                                <div className="stat-label">{stat.label}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-            
-            {/* Features Section */}
-            <section className="landing-features-new">
-                <div className="landing-container">
-                    <div className="section-header">
-                        <h2 className="section-title">Почему выбирают нас</h2>
-                        <p className="section-subtitle">Всё что нужно для комфортной доставки грузов</p>
-                    </div>
-                    <div className="features-grid">
-                        {features.map((f, i) => (
-                            <div key={i} className="feature-card">
-                                <div className="feature-icon">
-                                    <i className={'bi ' + f.icon}></i>
-                                </div>
-                                <h3 className="feature-title">{f.title}</h3>
-                                <p className="feature-desc">{f.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-            
-            {/* Gallery Section */}
-            <section className="landing-gallery">
-                <div className="landing-container">
-                    <div className="section-header">
-                        <h2 className="section-title">Как это работает</h2>
-                        <p className="section-subtitle">Простой процесс от заказа до доставки</p>
-                    </div>
-                    <div className="gallery-container">
-                        <div className="gallery-main">
-                            <div className="gallery-image-placeholder">
-                                <i className="bi bi-image" style={{fontSize:64,color:'var(--text-muted)'}}></i>
-                                <p style={{marginTop:16,color:'var(--text-muted)'}}>
-                                    Изображение {activeGalleryImg + 1}: {galleryImages[activeGalleryImg].title}
-                                </p>
-                                <p style={{fontSize:14,color:'var(--text-light)'}}>
-                                    {galleryImages[activeGalleryImg].desc}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="gallery-thumbs">
-                            {galleryImages.map((img, i) => (
-                                <div key={img.id} 
-                                    className={`gallery-thumb ${i === activeGalleryImg ? 'active' : ''}`}
-                                    onClick={() => setActiveGalleryImg(i)}>
-                                    <div className="gallery-thumb-placeholder">
-                                        <i className="bi bi-image"></i>
-                                    </div>
-                                    <span>{img.title}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             </section>
             
