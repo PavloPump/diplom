@@ -60,10 +60,10 @@ function NotificationBell({ userId }) {
                                     <div>Нет уведомлений</div>
                                 </div>
                             ) : notifications.map(n => (
-                                <div key={n.id} style={{padding:12,borderRadius:8,background:n.is_read?'transparent':'var(--gray-100)',marginBottom:8,border:'1px solid var(--border)'}}>
-                                    <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{n.title}</div>
-                                    <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:6}}>{n.message}</div>
-                                    <div style={{fontSize:11,color:'var(--text-light)'}}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
+                                <div key={n.id} style={{padding:14,borderRadius:8,background:n.is_read?'transparent':'var(--gray-100)',marginBottom:10,border:'1px solid var(--border)'}}>
+                                    <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>{n.title}</div>
+                                    <div style={{fontSize:15,color:'var(--text-muted)',marginBottom:8}}>{n.message}</div>
+                                    <div style={{fontSize:14,color:'var(--text-light)'}}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
                                 </div>
                             ))}
                         </div>
@@ -1155,7 +1155,7 @@ function Profile({ onUpdate, orders }) {
                 <div className="card-content card-content-padding" style={{textAlign:'center'}}>
                     <div className="avatar">{profile.full_name.charAt(0).toUpperCase()}</div>
                     <div style={{fontWeight:700,fontSize:18}}>{profile.full_name}</div>
-                    <div style={{color:'var(--text-muted)',fontSize:13,marginBottom:6}}>{profile.email}</div>
+                    <div style={{color:'var(--text-muted)',fontSize:15,marginBottom:6}}>{profile.email}</div>
                     <span className="badge color-gray">{roleLabel[profile.role]||profile.role}</span>
                 </div>
             </div>
@@ -1167,15 +1167,15 @@ function Profile({ onUpdate, orders }) {
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{totalOrders}</div>
-                                <div style={{fontSize:12,color:'var(--text-muted)'}}>Всего заказов</div>
+                                <div style={{fontSize:14,color:'var(--text-muted)'}}>Всего заказов</div>
                             </div>
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{completedOrders}</div>
-                                <div style={{fontSize:12,color:'var(--text-muted)'}}>Выполнено</div>
+                                <div style={{fontSize:14,color:'var(--text-muted)'}}>Выполнено</div>
                             </div>
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:24,fontWeight:700,marginBottom:4}}>{totalSpent.toLocaleString('ru-RU')} ₽</div>
-                                <div style={{fontSize:12,color:'var(--text-muted)'}}>{profile.role === 'driver' ? 'Заработано' : 'Потрачено'}</div>
+                                <div style={{fontSize:14,color:'var(--text-muted)'}}>{profile.role === 'driver' ? 'Заработано' : 'Потрачено'}</div>
                             </div>
                         </div>
                     </div>
@@ -1263,19 +1263,19 @@ function Profile({ onUpdate, orders }) {
                         <form onSubmit={handlePasswordChange}>
                             <div className="card-content-padding">
                                 <div style={{marginBottom:16}}>
-                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Текущий пароль</label>
+                                    <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Текущий пароль</label>
                                     <input type="password" value={securityForm.current_password} onChange={e=>setSecurityForm(p=>({...p,current_password:e.target.value}))} 
-                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                        required style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
-                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Новый пароль</label>
+                                    <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Новый пароль</label>
                                     <input type="password" value={securityForm.new_password} onChange={e=>setSecurityForm(p=>({...p,new_password:e.target.value}))} 
-                                        required minLength={6} style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                        required minLength={6} style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
-                                    <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Подтвердите новый пароль</label>
+                                    <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Подтвердите новый пароль</label>
                                     <input type="password" value={securityForm.confirm_password} onChange={e=>setSecurityForm(p=>({...p,confirm_password:e.target.value}))} 
-                                        required minLength={6} style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                        required minLength={6} style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
                                 </div>
                             </div>
                             <div className="card-footer">
