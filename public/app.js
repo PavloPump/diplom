@@ -178,10 +178,10 @@ function CompleteOrderDialog({ show, onConfirm, onCancel }) {
                             style={{
                                 width:'100%',
                                 minHeight:120,
-                                padding:'14px 18px',
+                                padding:'12px 14px',
                                 border:'1px solid var(--border)',
-                                borderRadius:'var(--radius)',
-                                fontSize:16,
+                                borderRadius:10,
+                                fontSize:15,
                                 fontFamily:'inherit',
                                 resize:'vertical'
                             }}
@@ -580,12 +580,14 @@ function LandingPage() {
                                 placeholder="Введите номер заказа"
                                 style={{
                                     flex:'1 1 200px',
-                                    padding:'16px 20px',
-                                    fontSize:18,
-                                    border:'2px solid var(--border)',
-                                    borderRadius:'var(--radius)',
+                                    height:46,
+                                    padding:'0 14px',
+                                    fontSize:15,
+                                    border:'1px solid var(--border)',
+                                    borderRadius:10,
                                     fontFamily:'inherit',
-                                    minWidth:200
+                                    minWidth:200,
+                                    background:'#fff'
                                 }}
                             />
                             <button type="submit" className="button button-fill button-large" disabled={trackingLoading} style={{flex:'0 0 auto',minWidth:120}}>
@@ -997,7 +999,7 @@ function ReviewModal({ show, orderId, toUserId, onClose, onSubmit }) {
                             <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>Комментарий (необязательно)</div>
                             <textarea value={comment} onChange={e=>setComment(e.target.value)} 
                                 placeholder="Расскажите о вашем опыте..."
-                                style={{width:'100%',minHeight:100,padding:12,border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,fontFamily:'inherit',resize:'vertical'}}></textarea>
+                                style={{width:'100%',minHeight:100,padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'inherit',resize:'vertical'}}></textarea>
                         </div>
                     </div>
                     <div className="card-footer">
@@ -1203,7 +1205,7 @@ function OrderList({ userRole, userId, refreshKey }) {
                 <div style={{position:'relative'}}>
                     <i className="bi bi-search" style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)',fontSize:16}}></i>
                     <input type="text" placeholder="Поиск по номеру, адресу, грузу..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-                        style={{width:'100%',height:44,padding:'0 16px 0 44px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,background:'var(--surface)'}} />
+                        style={{width:'100%',height:46,padding:'0 14px 0 44px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,background:'#fff'}} />
                     {searchQuery && (
                         <button onClick={()=>setSearchQuery('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',border:'none',background:'transparent',cursor:'pointer',padding:4}}>
                             <i className="bi bi-x-lg" style={{fontSize:14,color:'var(--text-muted)'}}></i>
@@ -1420,17 +1422,17 @@ function Profile({ onUpdate, orders }) {
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Текущий пароль</label>
                                     <input type="password" value={securityForm.current_password} onChange={e=>setSecurityForm(p=>({...p,current_password:e.target.value}))} 
-                                        required style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
+                                        required style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Новый пароль</label>
                                     <input type="password" value={securityForm.new_password} onChange={e=>setSecurityForm(p=>({...p,new_password:e.target.value}))} 
-                                        required minLength={6} style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
+                                        required minLength={6} style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:15,fontWeight:600,marginBottom:8}}>Подтвердите новый пароль</label>
                                     <input type="password" value={securityForm.confirm_password} onChange={e=>setSecurityForm(p=>({...p,confirm_password:e.target.value}))} 
-                                        required minLength={6} style={{width:'100%',height:48,padding:'0 18px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:16}} />
+                                        required minLength={6} style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15}} />
                                 </div>
                             </div>
                             <div className="card-footer">
@@ -1448,17 +1450,17 @@ function Profile({ onUpdate, orders }) {
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Текущий email</label>
                                     <input type="email" value={profile.email} disabled 
-                                        style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14,background:'var(--gray-100)',color:'var(--text-muted)'}} />
+                                        style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,background:'var(--gray-100)',color:'var(--text-muted)'}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Новый email</label>
                                     <input type="email" value={emailForm.new_email} onChange={e=>setEmailForm(p=>({...p,new_email:e.target.value}))} 
-                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                        required style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15}} />
                                 </div>
                                 <div style={{marginBottom:16}}>
                                     <label style={{display:'block',fontSize:13,fontWeight:600,marginBottom:6}}>Подтвердите паролем</label>
                                     <input type="password" value={emailForm.password} onChange={e=>setEmailForm(p=>({...p,password:e.target.value}))} 
-                                        required style={{width:'100%',height:44,padding:'0 16px',border:'1px solid var(--border)',borderRadius:'var(--radius)',fontSize:14}} />
+                                        required style={{width:'100%',height:46,padding:'0 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15}} />
                                 </div>
                             </div>
                             <div className="card-footer">
@@ -1624,7 +1626,7 @@ function AdminPanel() {
                                 <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
                                     {u.role === 'admin' ? <span className="badge color-red">Админ</span> : (
                                         <select value={u.role} onChange={e=>changeRole(u.id,e.target.value)}
-                                            style={{border:'1px solid #e4e4e7',borderRadius:6,padding:'4px 8px',fontSize:13,background:'#fff'}}>
+                                            style={{border:'1px solid var(--border)',borderRadius:10,padding:'0 14px',fontSize:15,background:'#fff',height:40}}>
                                             <option value="client">Клиент</option>
                                             <option value="driver">Водитель</option>
                                             <option value="admin">Администратор</option>
@@ -2148,6 +2150,7 @@ function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [orders, setOrders] = useState([]);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [menuOpen, setMenuOpen] = useState(false);
 
     const checkAuth = async () => {
         const r = await api.checkAuth();
@@ -2168,6 +2171,7 @@ function App() {
 
     const handleTabClick = (tab) => {
         setActiveTab(tab);
+        setMenuOpen(false);
     };
 
     if (checking) return (
@@ -2202,6 +2206,13 @@ function App() {
         ...(user.role==='admin' ? [{ id:'admin', icon:'bi-shield-lock', label:'Админ' }] : []),
     ];
 
+    // Мобильная панель: только ключевые пункты
+    const mobileTabItems = [
+        { id:'dashboard', icon:'bi-house', label:'Главная' },
+        ...(user.role==='client' ? [{ id:'create', icon:'bi-plus-circle', label:'Новый заказ' }] : []),
+        { id:'profile', icon:'bi-person', label:'Профиль' }
+    ];
+
     return (
         <div id="app">
             <div className="app-layout">
@@ -2231,6 +2242,47 @@ function App() {
 
                 {/* Main Content */}
                 <div className="main-content">
+                    {/* Mobile top navbar */}
+                    <div className="mobile-navbar">
+                        <div className="navbar-inner">
+                            <div className="navbar-left">
+                                <button className={'hamburger-btn' + (menuOpen ? ' open' : '')} onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
+                                    <span></span><span></span><span></span>
+                                </button>
+                                <div className="navbar-brand">
+                                    <i className="bi bi-truck"></i>
+                                    <span>DeliveryCarGo</span>
+                                </div>
+                            </div>
+                            <div className="navbar-right">
+                                <NotificationBell userId={user.id} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Mobile Menu Overlay */}
+                    <div className={'mobile-menu-overlay' + (menuOpen ? ' open' : '')} onClick={() => setMenuOpen(false)}></div>
+                    <div className={'mobile-menu-panel' + (menuOpen ? ' open' : '')}>
+                        <div className="mobile-menu-head">
+                            <div className="menu-brand"><i className="bi bi-truck"></i><span>DeliveryCarGo</span></div>
+                            <button className="mobile-menu-close" onClick={() => setMenuOpen(false)}><i className="bi bi-x"></i></button>
+                        </div>
+                        <div className="mobile-menu-nav">
+                            {tabItems.map(t => (
+                                <button key={t.id} className={'mobile-menu-link' + (activeTab === t.id ? ' active' : '')} onClick={() => handleTabClick(t.id)}>
+                                    <i className={'bi ' + t.icon}></i>
+                                    <span>{t.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mobile-menu-footer">
+                            <button className="mobile-menu-logout" onClick={logout}>
+                                <i className="bi bi-box-arrow-right"></i>
+                                <span>Выйти из аккаунта</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Page content */}
                     <div className="page-content page-content-main">
                         <ToastContainer />
@@ -2248,19 +2300,6 @@ function App() {
                         </div>
                     </div>
 
-                    {/* Bottom toolbar for Mobile */}
-                    <div className="toolbar toolbar-bottom toolbar-main mobile-toolbar">
-                        <div className="toolbar-inner">
-                            {tabItems.map(t => (
-                                <a key={t.id} href="#" 
-                                   className={'toolbar-link' + (activeTab===t.id?' active':'')}
-                                   onClick={e=>{e.preventDefault();handleTabClick(t.id);}}>
-                                    <i className={'bi '+t.icon}></i>
-                                    <span>{t.label}</span>
-                                </a>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
